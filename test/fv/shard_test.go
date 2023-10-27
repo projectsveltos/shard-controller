@@ -45,6 +45,8 @@ var _ = Describe("Shard", func() {
 		currentCluster.Annotations[sharding.ShardAnnotation] = shard
 		Expect(k8sClient.Update(context.TODO(), currentCluster)).To(Succeed())
 
+		verifyAnnotation(shard)
+
 		Byf("Verifying projectsveltos deployments are created for shard %s", shard)
 		verifyDeploymentPresence(shard)
 
@@ -167,4 +169,14 @@ func instantiateTemplate(deploymentTemplate []byte, shardKey string) ([]byte, er
 	}
 
 	return buffer.Bytes(), nil
+}
+
+func verifyAnnotation(shard string) {
+	currentCluster := &clusterv1.Cluster{}
+	Expect(k8sClient.Get(context.TODO(),
+		types.NamespacedName{Namespace: kindWorkloadCluster.Namespace, Name: kindWorkloadCluster.Name},
+		currentCluster)).To(Succeed())
+	v, ok := currentCluster.Annotations[sharding.ShardAnnotation]
+	Expect(ok).To(BeTrue())
+	Expect(v).To(Equal(shard))
 }

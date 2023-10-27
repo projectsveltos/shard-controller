@@ -204,7 +204,7 @@ kind: Deployment
 metadata:
   labels:
     control-plane: shard-controller
-  name: shard-manager
+  name: shard-controller
   namespace: projectsveltos
 spec:
   replicas: 1

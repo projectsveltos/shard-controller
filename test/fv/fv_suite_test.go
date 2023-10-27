@@ -156,6 +156,8 @@ var _ = BeforeSuite(func() {
 		return k8sClient.Update(context.TODO(), currentCluster)
 	})
 	Expect(err).To(BeNil())
+
+	time.Sleep(10 * time.Second)
 })
 
 // Byf is a simple wrapper around By.
