@@ -8,7 +8,7 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: manager
+  name: controller
   namespace: projectsveltos
   labels:
     control-plane: shard-controller
