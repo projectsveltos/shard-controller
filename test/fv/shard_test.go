@@ -115,23 +115,23 @@ func verifyDeployment(deplTemplate []byte, shardKey string) {
 }
 
 func verifyDeploymentsAreGone(shardKey string) {
-	By("Verify addon-controller deployment")
+	By("Verify addon-controller deployment is gone")
 	addonControllerTemplate := controllerSharding.GetAddonControllerTemplate()
 	verifyDeploymentIsGone(addonControllerTemplate, shardKey)
 
-	By("Verify classifier deployment")
+	By("Verify classifier deployment is gone")
 	classifierTemplate := controllerSharding.GetClassifierTemplate()
 	verifyDeploymentIsGone(classifierTemplate, shardKey)
 
-	By("Verify event-manager deployment")
+	By("Verify event-manager deployment is gone")
 	eventManagerTemplate := controllerSharding.GetEventManagerTemplate()
 	verifyDeploymentIsGone(eventManagerTemplate, shardKey)
 
-	By("Verify healtchcheck-manager deployment")
+	By("Verify healtchcheck-manager deployment is gone")
 	healthCheckTemplate := controllerSharding.GetHealthCheckManagerTemplate()
 	verifyDeploymentIsGone(healthCheckTemplate, shardKey)
 
-	By("Verify sveltos-cluster deployment")
+	By("Verify sveltos-cluster deployment is gone")
 	sveltosClusterTemplate := controllerSharding.GetSveltosClusterManagerTemplate()
 	verifyDeploymentIsGone(sveltosClusterTemplate, shardKey)
 }
@@ -148,7 +148,10 @@ func verifyDeploymentIsGone(deplTemplate []byte, shardKey string) {
 		err = k8sClient.Get(context.TODO(),
 			types.NamespacedName{Namespace: deployment.GetNamespace(), Name: deployment.GetName()},
 			currentDeployment)
-		return apierrors.IsNotFound(err)
+		if err != nil {
+			return apierrors.IsNotFound(err)
+		}
+		return !currentDeployment.DeletionTimestamp.IsZero()
 	}, timeout, pollingInterval).Should(BeTrue())
 }
 
