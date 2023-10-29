@@ -48,9 +48,16 @@ import (
 )
 
 var (
-	setupLog    = ctrl.Log.WithName("setup")
-	metricsAddr string
-	probeAddr   string
+	setupLog           = ctrl.Log.WithName("setup")
+	metricsAddr        string
+	probeAddr          string
+	agentInMgmtCluster bool
+	reportMode         controller.ReportMode
+	tmpReportMode      int
+)
+
+const (
+	defaulReportMode = int(controller.CollectFromManagementCluster)
 )
 
 func main() {
@@ -69,6 +76,8 @@ func main() {
 	pflag.Parse()
 
 	ctrl.SetLogger(klog.Background())
+
+	reportMode = controller.ReportMode(tmpReportMode)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -89,9 +98,11 @@ func main() {
 		ctrl.GetConfigOrDie())
 
 	if err = (&controller.SveltosClusterReconciler{
-		Config: mgr.GetConfig(),
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Config:             mgr.GetConfig(),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		AgentInMgmtCluster: agentInMgmtCluster,
+		ReportMode:         reportMode,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SveltosCluster")
 		os.Exit(1)
@@ -116,6 +127,16 @@ func initFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&probeAddr, "health-probe-bind-address", ":8081",
 		"The address the probe endpoint binds to.")
+
+	fs.BoolVar(&agentInMgmtCluster,
+		"agent-in-mgmt-cluster",
+		false,
+		"flag which is passed to sveltos deployments created for a cluster shard")
+
+	fs.IntVar(&tmpReportMode,
+		"report-mode",
+		defaulReportMode,
+		"flag which is passed to sveltos deployments created for a cluster shard")
 }
 
 func setupChecks(mgr ctrl.Manager) {
@@ -147,9 +168,11 @@ func capiWatchers(ctx context.Context, mgr ctrl.Manager, logger logr.Logger) {
 			} else {
 				setupLog.V(logsettings.LogInfo).Info("CAPI present.")
 				if err = (&controller.ClusterReconciler{
-					Config: mgr.GetConfig(),
-					Client: mgr.GetClient(),
-					Scheme: mgr.GetScheme(),
+					Config:             mgr.GetConfig(),
+					Client:             mgr.GetClient(),
+					Scheme:             mgr.GetScheme(),
+					AgentInMgmtCluster: agentInMgmtCluster,
+					ReportMode:         reportMode,
 				}).SetupWithManager(mgr); err != nil {
 					setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 					os.Exit(1)

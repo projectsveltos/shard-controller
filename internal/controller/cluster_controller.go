@@ -33,7 +33,9 @@ import (
 type ClusterReconciler struct {
 	*rest.Config
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	AgentInMgmtCluster bool
+	ReportMode         ReportMode
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch
@@ -46,7 +48,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Fecth the Cluster instance
 	cluster := &clusterv1.Cluster{}
 	addTypeInformationToObject(r.Scheme, cluster)
-	return reconcile.Result{}, processCluster(ctx, r.Config, r.Client, cluster, req, logger)
+	return reconcile.Result{}, processCluster(ctx, r.Config, r.Client, r.AgentInMgmtCluster,
+		cluster, req, logger)
 }
 
 // SetupWithManager sets up the controller with the Manager.

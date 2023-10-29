@@ -19,12 +19,14 @@ package controller
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"sync"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -60,6 +62,22 @@ func InitMaps() {
 	mux = sync.RWMutex{}
 }
 
+type ReportMode int
+
+const (
+	// Default mode. In this mode, Classifier running
+	// in the management cluster periodically collect
+	// ClassifierReport from Sveltos/CAPI clusters
+	CollectFromManagementCluster ReportMode = iota
+
+	// In this mode, classifier agent sends ClassifierReport
+	// to management cluster.
+	// SveltosAgent is provided with Kubeconfig to access
+	// management cluster and can only update ClassifierReport/
+	// HealthCheckReport/EventReport
+	AgentSendReportsNoGateway
+)
+
 //+kubebuilder:rbac:groups=lib.projectsveltos.io,resources=debuggingconfigurations,verbs=get;list;watch
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
@@ -81,7 +99,7 @@ func InitScheme() (*runtime.Scheme, error) {
 }
 
 func processCluster(ctx context.Context, config *rest.Config, c client.Client,
-	cluster client.Object, req ctrl.Request, logger logr.Logger) error {
+	agentInMgmtCluster bool, cluster client.Object, req ctrl.Request, logger logr.Logger) error {
 
 	clusterRef := getObjectReferenceFromObject(c.Scheme(), cluster)
 
@@ -108,7 +126,7 @@ func processCluster(ctx context.Context, config *rest.Config, c client.Client,
 		currentShard = annotations[sharding.ShardAnnotation]
 	}
 
-	return trackCluster(ctx, config, c, clusterRef, currentShard, logger)
+	return trackCluster(ctx, config, c, agentInMgmtCluster, clusterRef, currentShard, logger)
 }
 
 // trackCluster starts tracking a cluster:
@@ -121,7 +139,7 @@ func processCluster(ctx context.Context, config *rest.Config, c client.Client,
 // If cluster was previously associated to a different shard and after
 // cluster moves to currentShardKey, no more clusters are part of old shard,
 // removes projectsveltos deployments for old shard.
-func trackCluster(ctx context.Context, config *rest.Config, c client.Client,
+func trackCluster(ctx context.Context, config *rest.Config, c client.Client, agentInMgmtCluster bool,
 	cluster *corev1.ObjectReference, currentShardKey string, logger logr.Logger) error {
 
 	mux.Lock()
@@ -158,7 +176,7 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client,
 	// currentShardKey
 	if shardMap[currentShardKey] == nil || shardMap[currentShardKey].Len() == 0 {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("first cluster matching shard %q", currentShardKey))
-		if err := deployControllers(ctx, c, currentShardKey, logger); err != nil {
+		if err := deployControllers(ctx, c, currentShardKey, agentInMgmtCluster, logger); err != nil {
 			return err
 		}
 	}
@@ -237,7 +255,9 @@ func addTypeInformationToObject(scheme *runtime.Scheme, obj client.Object) {
 	}
 }
 
-func deployControllers(ctx context.Context, c client.Client, shardKey string, logger logr.Logger) error {
+func deployControllers(ctx context.Context, c client.Client, shardKey string,
+	agentInMgmtCluster bool, logger logr.Logger) error {
+
 	if shardKey == "" {
 		// Clusters with no shard annotation are managed by the default projectsveltos deployments
 		return nil
@@ -246,14 +266,29 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, lo
 	logger = logger.WithValues("shard", shardKey)
 	logger.V(logs.LogDebug).Info("deploy projectsveltos controllers for shard")
 
+	var err error
 	addonControllerTemplate := controllerSharding.GetAddonControllerTemplate()
-	err := deployDeployment(ctx, c, addonControllerTemplate, shardKey)
+	if agentInMgmtCluster {
+		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
+		addonControllerTemplate, err = setOptions(addonControllerTemplate, shardKey, agentInMgmtCluster)
+		if err != nil {
+			return err
+		}
+	}
+	err = deployDeployment(ctx, c, addonControllerTemplate, shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create addon-controller deployment %v", err))
 		return err
 	}
 
 	classifierTemplate := controllerSharding.GetClassifierTemplate()
+	if agentInMgmtCluster {
+		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
+		classifierTemplate, err = setOptions(classifierTemplate, shardKey, agentInMgmtCluster)
+		if err != nil {
+			return err
+		}
+	}
 	err = deployDeployment(ctx, c, classifierTemplate, shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create classifier deployment %v", err))
@@ -403,5 +438,42 @@ func instantiateTemplate(deploymentTemplate []byte, shardKey string) ([]byte, er
 		return nil, err
 	}
 
+	return buffer.Bytes(), nil
+}
+
+func setOptions(deplTemplate []byte, shard string, agentInMgmtCluster bool) ([]byte, error) {
+	u, err := utils.GetUnstructured(deplTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	depl := appsv1.Deployment{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &depl)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range depl.Spec.Template.Spec.Containers {
+		// Sveltos deployments use kube-rbac-proxy and the second
+		// controller is the one we need to modify
+		if depl.Spec.Template.Spec.Containers[i].Name != "kube-rbac-proxy" {
+			depl.Spec.Template.Spec.Containers[i].Args = append(
+				depl.Spec.Template.Spec.Containers[i].Args,
+				"--agent-in-mgmt-cluster")
+			break
+		}
+	}
+
+	// Create a buffer to store the encoded JSON data.
+	buffer := bytes.NewBuffer([]byte{})
+
+	// Create a new encoder and encode the deployment object.
+	encoder := json.NewEncoder(buffer)
+	err = encoder.Encode(depl)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the encoded JSON data from the buffer.
 	return buffer.Bytes(), nil
 }
