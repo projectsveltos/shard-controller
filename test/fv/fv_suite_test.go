@@ -49,7 +49,7 @@ var (
 )
 
 const (
-	timeout         = 1 * time.Minute
+	timeout         = 2 * time.Minute
 	pollingInterval = 5 * time.Second
 	key             = "env"
 	value           = "fv"
@@ -157,7 +157,9 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).To(BeNil())
 
-	time.Sleep(10 * time.Second)
+	// Since we are updating cluster annotation, wait for a minute
+	// to avoid CAPI controllers to override it
+	time.Sleep(time.Minute)
 })
 
 // Byf is a simple wrapper around By.

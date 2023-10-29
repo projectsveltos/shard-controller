@@ -71,8 +71,8 @@ var _ = Describe("Shard", func() {
 		currentCluster.Annotations[sharding.ShardAnnotation] = ""
 		Expect(k8sClient.Update(context.TODO(), currentCluster)).To(Succeed())
 
-		Byf("Verifying projectsveltos deployments are created for shard %s", newShard)
-		verifyDeploymentPresence(newShard)
+		Byf("Verifying projectsveltos deployments are gone for shard %s", newShard)
+		verifyDeploymentsAreGone(newShard)
 	})
 })
 

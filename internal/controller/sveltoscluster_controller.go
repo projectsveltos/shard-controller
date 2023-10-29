@@ -33,7 +33,9 @@ import (
 type SveltosClusterReconciler struct {
 	*rest.Config
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	AgentInMgmtCluster bool
+	ReportMode         ReportMode
 }
 
 //+kubebuilder:rbac:groups=lib.projectsveltos.io,resources=sveltosclusters,verbs=get;list;watch
@@ -46,7 +48,8 @@ func (r *SveltosClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Fecth the SveltosCluster instance
 	sveltosCluster := &libsveltosv1alpha1.SveltosCluster{}
 	addTypeInformationToObject(r.Scheme, sveltosCluster)
-	return reconcile.Result{}, processCluster(ctx, r.Config, r.Client, sveltosCluster, req, logger)
+	return reconcile.Result{}, processCluster(ctx, r.Config, r.Client, r.AgentInMgmtCluster,
+		sveltosCluster, req, logger)
 }
 
 // SetupWithManager sets up the controller with the Manager.
