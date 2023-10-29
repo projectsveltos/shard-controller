@@ -70,7 +70,7 @@ var _ = Describe("Utils", func() {
 		shardKey := randomString()
 
 		// First cluster being registered as part of shardKey
-		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
+		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client, false,
 			clusterRef, shardKey, klogr.New())).To(BeNil())
 
 		currentShard, ok := (*controller.ClusterMap)[*clusterRef]
@@ -88,12 +88,12 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			clusterRef, oldShardKey, klogr.New())).To(BeNil())
+			false, clusterRef, oldShardKey, klogr.New())).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, oldShardKey)
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			clusterRef, newShardKey, klogr.New())).To(BeNil())
+			false, clusterRef, newShardKey, klogr.New())).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, newShardKey)
 
 		// Verify cluster is not registered anymore as matching oldShardKey
@@ -114,13 +114,13 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			clusterRef, shardKey, klogr.New())).To(BeNil())
+			false, clusterRef, shardKey, klogr.New())).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
 		// Second cluster being registered as part of shardKey
 		newClusterRef := getClusterRef()
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			newClusterRef, shardKey, klogr.New())).To(BeNil())
+			false, newClusterRef, shardKey, klogr.New())).To(BeNil())
 		verifyClusterIsRegisteredForShard(newClusterRef, shardKey)
 	})
 
@@ -131,7 +131,7 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			clusterRef, shardKey, klogr.New())).To(BeNil())
+			false, clusterRef, shardKey, klogr.New())).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
 		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, klogr.New())).To(Succeed())
@@ -153,7 +153,7 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			clusterRef, shardKey, klogr.New())).To(BeNil())
+			false, clusterRef, shardKey, klogr.New())).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
 		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, klogr.New())).To(Succeed())
@@ -210,7 +210,8 @@ var _ = Describe("Utils", func() {
 		Expect(testEnv.Create(context.TODO(), cluster)).To(Succeed())
 		Expect(waitForObject(context.TODO(), testEnv.Client, cluster)).To(Succeed())
 
-		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client, cluster, req, klogr.New())
+		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
+			false, cluster, req, klogr.New())
 		Expect(err).To(BeNil())
 
 		clusterRef := &corev1.ObjectReference{
@@ -234,7 +235,8 @@ var _ = Describe("Utils", func() {
 			return len(currentCluster.Annotations) == 0
 		}, timeout, pollingInterval).Should(BeTrue())
 
-		err = controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client, cluster, req, klogr.New())
+		err = controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
+			false, cluster, req, klogr.New())
 		Expect(err).To(BeNil())
 
 		verifyClusterIsRegisteredForShard(clusterRef, "")
@@ -278,7 +280,8 @@ var _ = Describe("Utils", func() {
 		(*controller.ClusterMap)[*clusterRef] = shardKey
 
 		// Cluster does not exist
-		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client, cluster, req, klogr.New())
+		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
+			false, cluster, req, klogr.New())
 		Expect(err).To(BeNil())
 
 		// Verify cluster is not registered anymore as matching oldShardKey
@@ -330,7 +333,8 @@ var _ = Describe("Utils", func() {
 
 		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjects...).Build()
 
-		Expect(controller.DeployControllers(context.TODO(), c, randomString(), klogr.New())).To(Succeed())
+		Expect(controller.DeployControllers(context.TODO(), c, randomString(),
+			false, klogr.New())).To(Succeed())
 
 		deploymentList := &appsv1.DeploymentList{}
 		listOptions := []client.ListOption{
@@ -343,6 +347,30 @@ var _ = Describe("Utils", func() {
 		Expect(len(deploymentList.Items)).To(Equal(expectedDeployment))
 	})
 
+	It("deployControllers deploys projectsveltos controllers passing agent-in-mgmt-cluster option", func() {
+		deploymentList := &appsv1.DeploymentList{}
+		listOptions := []client.ListOption{
+			client.InNamespace(projectsveltoNs),
+		}
+
+		Expect(testEnv.List(context.TODO(), deploymentList, listOptions...)).To(Succeed())
+
+		currentDeploments := len(deploymentList.Items)
+
+		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, randomString(),
+			true, klogr.New())).To(Succeed())
+
+		const expectedNewDeployment = 5 // addon-controller, event-manager, healthcheck-manager,
+		// classifier, sveltoscluster-manager
+		Eventually(func() bool {
+			err := testEnv.List(context.TODO(), deploymentList, listOptions...)
+			if err != nil {
+				return false
+			}
+			return len(deploymentList.Items) == currentDeploments+expectedNewDeployment
+		}, timeout, pollingInterval).Should(BeTrue())
+	})
+
 	It("undeployControllers undeploys projectsveltos controllers for a given shard", func() {
 		listOptions := []client.ListOption{
 			client.InNamespace(projectsveltoNs),
@@ -353,7 +381,8 @@ var _ = Describe("Utils", func() {
 		currentDeployments := len(deploymentList.Items)
 
 		shardKey := randomString()
-		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, shardKey, klogr.New())).To(Succeed())
+		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, shardKey,
+			false, klogr.New())).To(Succeed())
 
 		const expectedDeployment = 5 // addon-controller, event-manager, healthcheck-manager,
 		// classifier, sveltoscluster-manager
