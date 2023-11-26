@@ -224,7 +224,7 @@ spec:
         - --report-mode=0
         command:
         - /manager
-        image: projectsveltos/shard-controller-amd64:main
+        image: projectsveltos/shard-controller-amd64:v0.20.0
         livenessProbe:
           httpGet:
             path: /healthz
