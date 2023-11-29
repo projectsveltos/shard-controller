@@ -37,8 +37,11 @@ import (
 	"k8s.io/klog/v2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	libsveltosv1alpha1 "github.com/projectsveltos/libsveltos/api/v1alpha1"
 	"github.com/projectsveltos/libsveltos/lib/crd"
@@ -54,6 +57,10 @@ var (
 	agentInMgmtCluster bool
 	reportMode         controller.ReportMode
 	tmpReportMode      int
+	restConfigQPS      float32
+	restConfigBurst    int
+	webhookPort        int
+	syncPeriod         time.Duration
 )
 
 const (
@@ -79,12 +86,26 @@ func main() {
 
 	reportMode = controller.ReportMode(tmpReportMode)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	ctrlOptions := ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
-	})
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhook.NewServer(
+			webhook.Options{
+				Port: webhookPort,
+			}),
+		Cache: cache.Options{
+			SyncPeriod: &syncPeriod,
+		},
+	}
+
+	restConfig := ctrl.GetConfigOrDie()
+	restConfig.QPS = restConfigQPS
+	restConfig.Burst = restConfigBurst
+
+	mgr, err := ctrl.NewManager(restConfig, ctrlOptions)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -137,6 +158,25 @@ func initFlags(fs *pflag.FlagSet) {
 		"report-mode",
 		defaulReportMode,
 		"flag which is passed to sveltos deployments created for a cluster shard")
+
+	const defautlRestConfigQPS = 20
+	fs.Float32Var(&restConfigQPS, "kube-api-qps", defautlRestConfigQPS,
+		fmt.Sprintf("Maximum queries per second from the controller client to the Kubernetes API server. Defaults to %d",
+			defautlRestConfigQPS))
+
+	const defaultRestConfigBurst = 30
+	fs.IntVar(&restConfigBurst, "kube-api-burst", defaultRestConfigBurst,
+		fmt.Sprintf("Maximum number of queries that should be allowed in one burst from the controller client to the Kubernetes API server. Default %d",
+			defaultRestConfigBurst))
+
+	const defaultWebhookPort = 9443
+	fs.IntVar(&webhookPort, "webhook-port", defaultWebhookPort,
+		"Webhook Server port")
+
+	const defaultSyncPeriod = 10
+	fs.DurationVar(&syncPeriod, "sync-period", defaultSyncPeriod*time.Minute,
+		fmt.Sprintf("The minimum interval at which watched resources are reconciled (e.g. 15m). Default: %d minutes",
+			defaultSyncPeriod))
 }
 
 func setupChecks(mgr ctrl.Manager) {
