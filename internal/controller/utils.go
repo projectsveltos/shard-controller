@@ -270,7 +270,7 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string,
 	addonControllerTemplate := controllerSharding.GetAddonControllerTemplate()
 	if agentInMgmtCluster {
 		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
-		addonControllerTemplate, err = setOptions(addonControllerTemplate, shardKey, agentInMgmtCluster)
+		addonControllerTemplate, err = setOptions(addonControllerTemplate)
 		if err != nil {
 			return err
 		}
@@ -284,7 +284,7 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string,
 	classifierTemplate := controllerSharding.GetClassifierTemplate()
 	if agentInMgmtCluster {
 		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
-		classifierTemplate, err = setOptions(classifierTemplate, shardKey, agentInMgmtCluster)
+		classifierTemplate, err = setOptions(classifierTemplate)
 		if err != nil {
 			return err
 		}
@@ -441,7 +441,7 @@ func instantiateTemplate(deploymentTemplate []byte, shardKey string) ([]byte, er
 	return buffer.Bytes(), nil
 }
 
-func setOptions(deplTemplate []byte, shard string, agentInMgmtCluster bool) ([]byte, error) {
+func setOptions(deplTemplate []byte) ([]byte, error) {
 	u, err := utils.GetUnstructured(deplTemplate)
 	if err != nil {
 		return nil, err

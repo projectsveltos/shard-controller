@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -64,14 +65,19 @@ spec:
 )
 
 var _ = Describe("Utils", func() {
+	var logger logr.Logger
+
+	BeforeEach(func() {
+		logger = textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(1)))
+	})
+
 	It("trackCluster starts tracking a cluster", func() {
 		clusterRef := getClusterRef()
-
 		shardKey := randomString()
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client, false,
-			clusterRef, shardKey, klogr.New())).To(BeNil())
+			clusterRef, shardKey, logger)).To(BeNil())
 
 		currentShard, ok := (*controller.ClusterMap)[*clusterRef]
 		Expect(ok).To(BeTrue())
@@ -88,12 +94,12 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, oldShardKey, klogr.New())).To(BeNil())
+			false, clusterRef, oldShardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, oldShardKey)
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, newShardKey, klogr.New())).To(BeNil())
+			false, clusterRef, newShardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, newShardKey)
 
 		// Verify cluster is not registered anymore as matching oldShardKey
@@ -114,13 +120,13 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, shardKey, klogr.New())).To(BeNil())
+			false, clusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
 		// Second cluster being registered as part of shardKey
 		newClusterRef := getClusterRef()
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, newClusterRef, shardKey, klogr.New())).To(BeNil())
+			false, newClusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(newClusterRef, shardKey)
 	})
 
@@ -131,10 +137,10 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, shardKey, klogr.New())).To(BeNil())
+			false, clusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
-		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, klogr.New())).To(Succeed())
+		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, logger)).To(Succeed())
 
 		// Verify cluster is not registered anymore as matching shardKey
 		v, ok := (*controller.ShardMap)[shardKey]
@@ -153,10 +159,10 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, shardKey, klogr.New())).To(BeNil())
+			false, clusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
-		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, klogr.New())).To(Succeed())
+		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, logger)).To(Succeed())
 
 		// Verify cluster is not registered anymore as matching oldShardKey
 		v, ok := (*controller.ShardMap)[shardKey]
@@ -167,7 +173,7 @@ var _ = Describe("Utils", func() {
 		_, ok = (*controller.ClusterMap)[*clusterRef]
 		Expect(ok).To(BeFalse())
 
-		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, klogr.New())).To(Succeed())
+		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, logger)).To(Succeed())
 
 		// Verify cluster is not registered anymore as matching oldShardKey
 		v, ok = (*controller.ShardMap)[shardKey]
@@ -211,7 +217,7 @@ var _ = Describe("Utils", func() {
 		Expect(waitForObject(context.TODO(), testEnv.Client, cluster)).To(Succeed())
 
 		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, cluster, req, klogr.New())
+			false, cluster, req, logger)
 		Expect(err).To(BeNil())
 
 		clusterRef := &corev1.ObjectReference{
@@ -236,7 +242,7 @@ var _ = Describe("Utils", func() {
 		}, timeout, pollingInterval).Should(BeTrue())
 
 		err = controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, cluster, req, klogr.New())
+			false, cluster, req, logger)
 		Expect(err).To(BeNil())
 
 		verifyClusterIsRegisteredForShard(clusterRef, "")
@@ -281,7 +287,7 @@ var _ = Describe("Utils", func() {
 
 		// Cluster does not exist
 		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, cluster, req, klogr.New())
+			false, cluster, req, logger)
 		Expect(err).To(BeNil())
 
 		// Verify cluster is not registered anymore as matching oldShardKey
@@ -334,7 +340,7 @@ var _ = Describe("Utils", func() {
 		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjects...).Build()
 
 		Expect(controller.DeployControllers(context.TODO(), c, randomString(),
-			false, klogr.New())).To(Succeed())
+			false, logger)).To(Succeed())
 
 		deploymentList := &appsv1.DeploymentList{}
 		listOptions := []client.ListOption{
@@ -358,7 +364,7 @@ var _ = Describe("Utils", func() {
 		currentDeploments := len(deploymentList.Items)
 
 		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, randomString(),
-			true, klogr.New())).To(Succeed())
+			true, logger)).To(Succeed())
 
 		const expectedNewDeployment = 5 // addon-controller, event-manager, healthcheck-manager,
 		// classifier, sveltoscluster-manager
@@ -382,7 +388,7 @@ var _ = Describe("Utils", func() {
 
 		shardKey := randomString()
 		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, shardKey,
-			false, klogr.New())).To(Succeed())
+			false, logger)).To(Succeed())
 
 		const expectedDeployment = 5 // addon-controller, event-manager, healthcheck-manager,
 		// classifier, sveltoscluster-manager
@@ -394,7 +400,7 @@ var _ = Describe("Utils", func() {
 			return len(deploymentList.Items) == expectedDeployment+currentDeployments
 		}, timeout, pollingInterval).Should(BeTrue())
 
-		Expect(controller.UndeployControllers(context.TODO(), testEnv.Config, shardKey, klogr.New())).To(Succeed())
+		Expect(controller.UndeployControllers(context.TODO(), testEnv.Config, shardKey, logger)).To(Succeed())
 
 		Eventually(func() bool {
 			err := testEnv.List(context.TODO(), deploymentList, listOptions...)

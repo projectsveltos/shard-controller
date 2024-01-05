@@ -50,8 +50,8 @@ KIND := $(TOOLS_BIN_DIR)/kind
 KUBECTL := $(TOOLS_BIN_DIR)/kubectl
 CLUSTERCTL := $(TOOLS_BIN_DIR)/clusterctl
 
-GOLANGCI_LINT_VERSION := "v1.52.2"
-CLUSTERCTL_VERSION := "v1.6.0-rc.1"
+GOLANGCI_LINT_VERSION := "v1.55.2"
+CLUSTERCTL_VERSION := "v1.6.0"
 
 $(CONTROLLER_GEN): $(TOOLS_DIR)/go.mod # Build controller-gen from tools folder.
 	cd $(TOOLS_DIR); $(GOBUILD) -tags=tools -o $(subst $(TOOLS_DIR)/hack/tools/,,$@) sigs.k8s.io/controller-tools/cmd/controller-gen
