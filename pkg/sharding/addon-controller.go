@@ -42,10 +42,10 @@ spec:
         - --report-mode=0
         - --shard-key={{.SHARD}}
         - --v=5
-        - --version=main
+        - --version=v0.23.0
         command:
         - /manager
-        image: projectsveltos/addon-controller-amd64:main
+        image: projectsveltos/addon-controller-amd64:v0.23.0
         livenessProbe:
           httpGet:
             path: /healthz
