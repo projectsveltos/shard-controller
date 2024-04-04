@@ -42,7 +42,7 @@ spec:
         - --v=5
         command:
         - /manager
-        image: projectsveltos/event-manager-amd64:main
+        image: projectsveltos/event-manager:v0.27.0
         livenessProbe:
           failureThreshold: 3
           httpGet:
