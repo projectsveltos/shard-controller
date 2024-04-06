@@ -42,7 +42,7 @@ spec:
         - --v=5
         command:
         - /manager
-        image: projectsveltos/sveltoscluster-manager:v0.27.0
+        image: projectsveltos/sveltoscluster-manager:main
         livenessProbe:
           failureThreshold: 3
           httpGet:
