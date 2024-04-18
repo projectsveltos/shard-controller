@@ -41,10 +41,10 @@ spec:
         - --report-mode=0
         - --shard-key={{.SHARD}}
         - --v=5
-        - --version=main
+        - --version=v0.28.0
         command:
         - /manager
-        image: projectsveltos/addon-controller:main
+        image: projectsveltos/addon-controller:v0.28.0
         livenessProbe:
           failureThreshold: 3
           httpGet:
