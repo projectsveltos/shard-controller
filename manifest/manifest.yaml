@@ -151,7 +151,7 @@ spec:
         - --report-mode=0
         command:
         - /manager
-        image: projectsveltos/shard-controller:v0.28.0
+        image: projectsveltos/shard-controller:main
         livenessProbe:
           failureThreshold: 3
           httpGet:
