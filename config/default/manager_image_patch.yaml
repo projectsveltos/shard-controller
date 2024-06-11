@@ -8,5 +8,5 @@ spec:
     spec:
       containers:
       # Change the value of image field below to your controller image URL
-      - image: projectsveltos/shard-controller:v0.32.0
+      - image: projectsveltos/shard-controller:main
         name: manager
