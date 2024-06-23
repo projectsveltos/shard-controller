@@ -15,5 +15,5 @@ package external
 
 const (
 	clusterProfileGroup       = "config.projectsveltos.io"
-	clusterProfileTestVersion = "v1alpha1"
+	clusterProfileTestVersion = "v1beta1"
 )

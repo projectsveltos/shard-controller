@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	libsveltosv1alpha1 "github.com/projectsveltos/libsveltos/api/v1alpha1"
+	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
 	libsveltosset "github.com/projectsveltos/libsveltos/lib/set"
 	"github.com/projectsveltos/libsveltos/lib/sharding"
 	"github.com/projectsveltos/shard-controller/internal/controller"
@@ -187,7 +187,7 @@ var _ = Describe("Utils", func() {
 
 	It("processCluster, for existing cluster, starts tracking it", func() {
 		shardKey := randomString()
-		cluster := &libsveltosv1alpha1.SveltosCluster{
+		cluster := &libsveltosv1beta1.SveltosCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: randomString(),
 				Name:      randomString(),
@@ -223,8 +223,8 @@ var _ = Describe("Utils", func() {
 		clusterRef := &corev1.ObjectReference{
 			Namespace:  cluster.Namespace,
 			Name:       cluster.Name,
-			Kind:       libsveltosv1alpha1.SveltosClusterKind,
-			APIVersion: libsveltosv1alpha1.GroupVersion.String(),
+			Kind:       libsveltosv1beta1.SveltosClusterKind,
+			APIVersion: libsveltosv1beta1.GroupVersion.String(),
 		}
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
@@ -232,7 +232,7 @@ var _ = Describe("Utils", func() {
 		Expect(testEnv.Update(context.TODO(), cluster)).To(Succeed())
 
 		Eventually(func() bool {
-			currentCluster := &libsveltosv1alpha1.SveltosCluster{}
+			currentCluster := &libsveltosv1beta1.SveltosCluster{}
 			err = testEnv.Get(context.TODO(),
 				types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name}, currentCluster)
 			if err != nil {
@@ -255,7 +255,7 @@ var _ = Describe("Utils", func() {
 
 	It("processCluster, for deleted cluster, stops tracking it", func() {
 		shardKey := randomString()
-		cluster := &libsveltosv1alpha1.SveltosCluster{
+		cluster := &libsveltosv1beta1.SveltosCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: randomString(),
 				Name:      randomString(),
@@ -268,8 +268,8 @@ var _ = Describe("Utils", func() {
 		clusterRef := &corev1.ObjectReference{
 			Namespace:  cluster.Namespace,
 			Name:       cluster.Name,
-			Kind:       libsveltosv1alpha1.SveltosClusterKind,
-			APIVersion: libsveltosv1alpha1.GroupVersion.String(),
+			Kind:       libsveltosv1beta1.SveltosClusterKind,
+			APIVersion: libsveltosv1beta1.GroupVersion.String(),
 		}
 
 		req := ctrl.Request{
@@ -416,8 +416,8 @@ func getClusterRef() *corev1.ObjectReference {
 	return &corev1.ObjectReference{
 		Name:       randomString(),
 		Namespace:  randomString(),
-		Kind:       string(libsveltosv1alpha1.ClusterTypeSveltos),
-		APIVersion: libsveltosv1alpha1.GroupVersion.String(),
+		Kind:       string(libsveltosv1beta1.ClusterTypeSveltos),
+		APIVersion: libsveltosv1beta1.GroupVersion.String(),
 	}
 }
 
