@@ -44,7 +44,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	libsveltosv1alpha1 "github.com/projectsveltos/libsveltos/api/v1alpha1"
+	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
 	"github.com/projectsveltos/libsveltos/lib/crd"
 	"github.com/projectsveltos/libsveltos/lib/logsettings"
 	"github.com/projectsveltos/shard-controller/internal/controller"
@@ -119,7 +119,7 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	logsettings.RegisterForLogSettings(ctx,
-		libsveltosv1alpha1.ComponentShardController, ctrl.Log.WithName("log-setter"),
+		libsveltosv1beta1.ComponentShardController, ctrl.Log.WithName("log-setter"),
 		ctrl.GetConfigOrDie())
 
 	if err = (&controller.SveltosClusterReconciler{
