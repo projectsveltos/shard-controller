@@ -12,7 +12,7 @@ resources:
   domain: projectsveltos.io
   group: lib
   kind: SveltosCluster
-  version: v1alpha1
+  version: v1beta1
 - controller: true
   domain: x-k8s.io
   group: cluster
