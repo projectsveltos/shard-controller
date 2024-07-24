@@ -42,7 +42,7 @@ spec:
         - --v=5
         command:
         - /manager
-        image: projectsveltos/healthcheck-manager:main
+        image: docker.io/projectsveltos/healthcheck-manager:main
         livenessProbe:
           failureThreshold: 3
           httpGet:
