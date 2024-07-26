@@ -151,7 +151,7 @@ spec:
         - --report-mode=0
         command:
         - /manager
-        image: docker.io/projectsveltos/shard-controller:v0.35.0
+        image: docker.io/projectsveltos/shard-controller:main
         livenessProbe:
           failureThreshold: 3
           httpGet:
