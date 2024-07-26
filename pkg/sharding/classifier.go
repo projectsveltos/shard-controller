@@ -44,7 +44,7 @@ spec:
         - --version=main
         command:
         - /manager
-        image: projectsveltos/classifier:main
+        image: docker.io/projectsveltos/classifier:main
         livenessProbe:
           failureThreshold: 3
           httpGet:
