@@ -40,6 +40,7 @@ spec:
         - --diagnostics-address=:8443
         - --shard-key={{.SHARD}}
         - --v=5
+        - --version=main
         command:
         - /manager
         image: docker.io/projectsveltos/event-manager:main
