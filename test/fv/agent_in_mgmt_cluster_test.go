@@ -24,15 +24,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
+	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
 	"github.com/projectsveltos/libsveltos/lib/sharding"
-	"github.com/projectsveltos/libsveltos/lib/utils"
 	controllerSharding "github.com/projectsveltos/shard-controller/pkg/sharding"
-
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -99,7 +98,7 @@ var _ = Describe("Agent in management cluster mode", Serial, func() {
 		data, err := instantiateTemplate(addonControllerTemplate, shard)
 		Expect(err).To(BeNil())
 
-		deployment, err := utils.GetUnstructured(data)
+		deployment, err := k8s_utils.GetUnstructured(data)
 		Expect(err).To(BeNil())
 
 		addonDeployment := &appsv1.Deployment{}

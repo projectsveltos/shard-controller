@@ -40,10 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
+	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
 	logs "github.com/projectsveltos/libsveltos/lib/logsettings"
 	libsveltosset "github.com/projectsveltos/libsveltos/lib/set"
 	"github.com/projectsveltos/libsveltos/lib/sharding"
-	"github.com/projectsveltos/libsveltos/lib/utils"
 	controllerSharding "github.com/projectsveltos/shard-controller/pkg/sharding"
 )
 
@@ -374,7 +374,7 @@ func deployDeployment(ctx context.Context, c client.Client,
 		return err
 	}
 
-	deployment, err := utils.GetUnstructured(data)
+	deployment, err := k8s_utils.GetUnstructured(data)
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ func undeployDeployment(ctx context.Context, config *rest.Config,
 		return err
 	}
 
-	deployment, err := utils.GetUnstructured(data)
+	deployment, err := k8s_utils.GetUnstructured(data)
 	if err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ func instantiateTemplate(deploymentTemplate []byte, shardKey string) ([]byte, er
 }
 
 func setOptions(deplTemplate []byte) ([]byte, error) {
-	u, err := utils.GetUnstructured(deplTemplate)
+	u, err := k8s_utils.GetUnstructured(deplTemplate)
 	if err != nil {
 		return nil, err
 	}
