@@ -44,6 +44,15 @@ spec:
         - --version=main
         command:
         - /manager
+        env:
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
         image: docker.io/projectsveltos/addon-controller:main
         livenessProbe:
           failureThreshold: 3
@@ -77,6 +86,8 @@ spec:
           capabilities:
             drop:
             - ALL
+          seccompProfile:
+            type: RuntimeDefault
         volumeMounts:
         - mountPath: /tmp
           name: tmp
