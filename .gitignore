@@ -28,6 +28,11 @@ bin/manager
 
 manager_image_patch.yaml-e
 manager_pull_policy.yaml-e
+pkg/sharding/ac.yaml-e
+pkg/sharding/classifier.yaml-e
+pkg/sharding/em.yaml-e
+pkg/sharding/hm.yaml-e
+pkg/sharding/sc.yaml-e
 
 version.txt
 

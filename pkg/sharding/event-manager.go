@@ -43,7 +43,7 @@ spec:
         - --version=main
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager:main
+        image: docker.io/projectsveltos/event-manager@sha256:99633ed354b516981367d3bd6237995eb7dedd4fa42bc3d96d2d8967ee058bfe
         livenessProbe:
           failureThreshold: 3
           httpGet:

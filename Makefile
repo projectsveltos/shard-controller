@@ -217,14 +217,6 @@ delete-cluster: $(KIND) ## Deletes the kind cluster $(CONTROL_CLUSTER_NAME)
 
 ##@ Build
 
-shard-deployment:
-	curl -L https://raw.githubusercontent.com/projectsveltos/addon-controller/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/ac.yaml
-	curl -L https://raw.githubusercontent.com/projectsveltos/event-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/em.yaml
-	curl -L https://raw.githubusercontent.com/projectsveltos/healthcheck-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/hm.yaml
-	curl -L https://raw.githubusercontent.com/projectsveltos/sveltoscluster-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/sc.yaml
-	curl -L https://raw.githubusercontent.com/projectsveltos/classifier/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/classifier.yaml
-	cd pkg/sharding; go generate
-
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
@@ -343,3 +335,22 @@ deploy-projectsveltos: $(KUSTOMIZE)
 
 	@echo "Waiting for projectsveltos shard-controller to be available..."
 	$(KUBECTL) wait --for=condition=Available deployment/shard-controller -n projectsveltos --timeout=$(TIMEOUT)
+
+
+ac_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/addon-controller:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+em_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/event-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+hcm_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/healthcheck-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+scm_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/sveltoscluster-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+cm_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/classifier:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+shard-deployment:
+	curl -L https://raw.githubusercontent.com/projectsveltos/addon-controller/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/ac.yaml
+	sed -i'' -e "s#image: docker.io/projectsveltos/addon-controller:${TAG}#image: docker.io/projectsveltos/addon-controller@${ac_digest}#g" ./pkg/sharding/ac.yaml
+	curl -L https://raw.githubusercontent.com/projectsveltos/event-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/em.yaml
+	sed -i'' -e "s#image: docker.io/projectsveltos/event-manager:${TAG}#image: docker.io/projectsveltos/event-manager@${em_digest}#g" ./pkg/sharding/em.yaml
+	curl -L https://raw.githubusercontent.com/projectsveltos/healthcheck-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/hm.yaml
+	sed -i'' -e "s#image: docker.io/projectsveltos/healthcheck-manager:${TAG}#image: docker.io/projectsveltos/healthcheck-manager@${hcm_digest}#g" ./pkg/sharding/hm.yaml
+	curl -L https://raw.githubusercontent.com/projectsveltos/sveltoscluster-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/sc.yaml
+	sed -i'' -e "s#image: docker.io/projectsveltos/sveltoscluster-manager:${TAG}#image: docker.io/projectsveltos/sveltoscluster-manager@${scm_digest}#g" ./pkg/sharding/sc.yaml
+	curl -L https://raw.githubusercontent.com/projectsveltos/classifier/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/classifier.yaml
+	sed -i'' -e "s#image: docker.io/projectsveltos/classifier:${TAG}#image: docker.io/projectsveltos/classifier@${cm_digest}#g" ./pkg/sharding/classifier.yaml
+	cd pkg/sharding; go generate
