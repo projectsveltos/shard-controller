@@ -2,7 +2,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # KUBEBUILDER_ENVTEST_KUBERNETES_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-KUBEBUILDER_ENVTEST_KUBERNETES_VERSION = 1.31.0
+KUBEBUILDER_ENVTEST_KUBERNETES_VERSION = 1.32.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -59,7 +59,7 @@ KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
 $(KUSTOMIZE): # Build kustomize from tools folder.
 	CGO_ENABLED=0 GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(KUSTOMIZE_PKG) $(KUSTOMIZE_BIN) $(KUSTOMIZE_VER)
 
-SETUP_ENVTEST_VER := v0.0.0-20240522175850-2e9781e9fc60
+SETUP_ENVTEST_VER := release-0.20
 SETUP_ENVTEST_BIN := setup-envtest
 SETUP_ENVTEST := $(abspath $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)-$(SETUP_ENVTEST_VER))
 SETUP_ENVTEST_PKG := sigs.k8s.io/controller-runtime/tools/setup-envtest
@@ -159,7 +159,7 @@ endif
 # K8S_VERSION for the Kind cluster can be set as environment variable. If not defined,
 # this default value is used
 ifndef K8S_VERSION
-K8S_VERSION := v1.32.0
+K8S_VERSION := v1.32.2
 endif
 
 KIND_CONFIG ?= kind-cluster.yaml
@@ -337,20 +337,40 @@ deploy-projectsveltos: $(KUSTOMIZE)
 	$(KUBECTL) wait --for=condition=Available deployment/shard-controller -n projectsveltos --timeout=$(TIMEOUT)
 
 
-ac_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/addon-controller:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
-em_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/event-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
-hcm_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/healthcheck-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
-scm_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/sveltoscluster-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
-cm_digest := $(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/classifier:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+define get_ac_digest
+$(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/addon-controller:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+endef
+
+define get_em_digest
+$(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/event-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+endef
+
+define get_hcm_digest
+$(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/healthcheck-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+endef
+
+define get_scm_digest
+$(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/sveltoscluster-manager:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+endef
+
+define get_cm_digest
+$(shell skopeo inspect --format '{{.Digest}}' "docker://projectsveltos/classifier:${TAG}" --override-os="linux" --override-arch="amd64" --override-variant="v8" 2>/dev/null)
+endef
+
 shard-deployment:
 	curl -L https://raw.githubusercontent.com/projectsveltos/addon-controller/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/ac.yaml
+	$(eval ac_digest :=$(call get_ac_digest))
 	sed -i'' -e "s#image: docker.io/projectsveltos/addon-controller:${TAG}#image: docker.io/projectsveltos/addon-controller@${ac_digest}#g" ./pkg/sharding/ac.yaml
 	curl -L https://raw.githubusercontent.com/projectsveltos/event-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/em.yaml
+	$(eval em_digest :=$(call get_em_digest))
 	sed -i'' -e "s#image: docker.io/projectsveltos/event-manager:${TAG}#image: docker.io/projectsveltos/event-manager@${em_digest}#g" ./pkg/sharding/em.yaml
 	curl -L https://raw.githubusercontent.com/projectsveltos/healthcheck-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/hm.yaml
+	$(eval hcm_digest :=$(call get_hcm_digest))
 	sed -i'' -e "s#image: docker.io/projectsveltos/healthcheck-manager:${TAG}#image: docker.io/projectsveltos/healthcheck-manager@${hcm_digest}#g" ./pkg/sharding/hm.yaml
 	curl -L https://raw.githubusercontent.com/projectsveltos/sveltoscluster-manager/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/sc.yaml
+	$(eval scm_digest :=$(call get_scm_digest))
 	sed -i'' -e "s#image: docker.io/projectsveltos/sveltoscluster-manager:${TAG}#image: docker.io/projectsveltos/sveltoscluster-manager@${scm_digest}#g" ./pkg/sharding/sc.yaml
 	curl -L https://raw.githubusercontent.com/projectsveltos/classifier/$(TAG)/manifest/deployment-shard.yaml -o ./pkg/sharding/classifier.yaml
+	$(eval cm_digest :=$(call get_cm_digest))
 	sed -i'' -e "s#image: docker.io/projectsveltos/classifier:${TAG}#image: docker.io/projectsveltos/classifier@${cm_digest}#g" ./pkg/sharding/classifier.yaml
 	cd pkg/sharding; go generate
