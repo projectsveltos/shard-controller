@@ -40,10 +40,10 @@ spec:
         - --diagnostics-address=:8443
         - --shard-key={{.SHARD}}
         - --v=5
-        - --version=main
+        - --version=v0.48.1
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager@sha256:c66c080c6b71082d018ed99adf570b903918d1e722501f87c2feac9fea1c02fa
+        image: docker.io/projectsveltos/event-manager@sha256:2dfacdcf28fbdf9bb2a452144b0ac85b8d5301b817356c2db69599e8a30b8b01
         livenessProbe:
           failureThreshold: 3
           httpGet:

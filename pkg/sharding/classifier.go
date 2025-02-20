@@ -41,10 +41,10 @@ spec:
         - --report-mode=0
         - --shard-key={{.SHARD}}
         - --v=5
-        - --version=main
+        - --version=v0.48.1
         command:
         - /manager
-        image: docker.io/projectsveltos/classifier@sha256:7895a14a8acd7dd67a45b2c219cce86f03c5b4bf904b4def5b91580f220f8691
+        image: docker.io/projectsveltos/classifier@sha256:4513157bb4712131c158a215d555d6dec1da47f28842027669d6736e4457a5d9
         livenessProbe:
           failureThreshold: 3
           httpGet:
