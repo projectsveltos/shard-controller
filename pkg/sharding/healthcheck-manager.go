@@ -40,10 +40,10 @@ spec:
         - --diagnostics-address=:8443
         - --shard-key={{.SHARD}}
         - --v=5
-        - --version=v0.48.0
+        - --version=v0.48.1
         command:
         - /manager
-        image: docker.io/projectsveltos/healthcheck-manager@sha256:c5944a31ce35b73ac967e5fbf34f586c20bd5d9ffe7dd35cfae57edc22e6ad62
+        image: docker.io/projectsveltos/healthcheck-manager@sha256:9960203dce71effafe8ecb4efacd11dc59c1f576d2581b7021e8cd64080adda0
         livenessProbe:
           failureThreshold: 3
           httpGet:
