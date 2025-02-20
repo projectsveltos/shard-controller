@@ -26,7 +26,7 @@ spec:
         - --version=main
         command:
         - /manager
-        image: docker.io/projectsveltos/classifier@sha256:7895a14a8acd7dd67a45b2c219cce86f03c5b4bf904b4def5b91580f220f8691
+        image: docker.io/projectsveltos/classifier@sha256:afbf5e747c24e0e0f6db835970067fe7775fdb33e99c5e35640dec38089f2def
         livenessProbe:
           failureThreshold: 3
           httpGet:

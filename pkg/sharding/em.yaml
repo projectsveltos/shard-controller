@@ -25,7 +25,7 @@ spec:
         - --version=main
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager@sha256:c66c080c6b71082d018ed99adf570b903918d1e722501f87c2feac9fea1c02fa
+        image: docker.io/projectsveltos/event-manager@sha256:88819a67e9407f1b736f8d04bf4e07370525b50dd7f654ec693d4f08366b62b5
         livenessProbe:
           failureThreshold: 3
           httpGet:
