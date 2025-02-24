@@ -40,6 +40,7 @@ spec:
         - --diagnostics-address=:8443
         - --report-mode=0
         - --shard-key={{.SHARD}}
+        - --capi-onboard-annotation=
         - --v=5
         - --version=main
         command:
@@ -53,7 +54,7 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
-        image: docker.io/projectsveltos/addon-controller@sha256:9bea4a7ea5a95cc6d185c11de96ca0e7e148d30d8e2d03cab65c681fe26017f2
+        image: docker.io/projectsveltos/addon-controller@sha256:3930d641420475c3cb82b023b4e91ca4a03d5a1a03c8a6a1560a4c01a3d25b0d
         livenessProbe:
           failureThreshold: 3
           httpGet:

@@ -40,11 +40,12 @@ spec:
         - --diagnostics-address=:8443
         - --report-mode=0
         - --shard-key={{.SHARD}}
+        - --capi-onboard-annotation=
         - --v=5
         - --version=main
         command:
         - /manager
-        image: docker.io/projectsveltos/classifier@sha256:afbf5e747c24e0e0f6db835970067fe7775fdb33e99c5e35640dec38089f2def
+        image: docker.io/projectsveltos/classifier@sha256:c55772fb9aec5cbb0f1e1aa000f39cf30509dffa96a4bf21db2310f71bf15310
         livenessProbe:
           failureThreshold: 3
           httpGet:
