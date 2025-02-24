@@ -21,11 +21,12 @@ spec:
       - args:
         - --diagnostics-address=:8443
         - --shard-key={{.SHARD}}
+        - --capi-onboard-annotation=
         - --v=5
         - --version=main
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager@sha256:88819a67e9407f1b736f8d04bf4e07370525b50dd7f654ec693d4f08366b62b5
+        image: docker.io/projectsveltos/event-manager@sha256:b8c5c5fb3698795a0a1f90d2381eb44a3b9fee0f4d63fe1fac7627af5a0a7308
         livenessProbe:
           failureThreshold: 3
           httpGet:
