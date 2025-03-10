@@ -25,6 +25,7 @@ spec:
         - --capi-onboard-annotation=
         - --v=5
         - --version=main
+        - --registry=
         command:
         - /manager
         image: docker.io/projectsveltos/classifier@sha256:c55772fb9aec5cbb0f1e1aa000f39cf30509dffa96a4bf21db2310f71bf15310
