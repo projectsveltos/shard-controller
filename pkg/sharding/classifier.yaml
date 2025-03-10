@@ -28,7 +28,7 @@ spec:
         - --registry=
         command:
         - /manager
-        image: docker.io/projectsveltos/classifier@sha256:c55772fb9aec5cbb0f1e1aa000f39cf30509dffa96a4bf21db2310f71bf15310
+        image: docker.io/projectsveltos/classifier@sha256:cf8f377a0a22a0c5ec25d302962be8d8a3237b80e846f6afed79384990a47cdf
         livenessProbe:
           failureThreshold: 3
           httpGet:
