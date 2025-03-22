@@ -44,7 +44,7 @@ spec:
         - --version=main
         command:
         - /manager
-        image: docker.io/projectsveltos/healthcheck-manager@sha256:41f875071b434e9c0f152d8dce694030388245d2569a58951cd3d6f1b12db3c6
+        image: docker.io/projectsveltos/healthcheck-manager@sha256:d5da19ffc659dd5ae8e0edbd3d647cd85250e5df344e4fb6836a6422b07fbd1b
         livenessProbe:
           failureThreshold: 3
           httpGet:
