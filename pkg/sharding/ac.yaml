@@ -36,7 +36,7 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
-        image: docker.io/projectsveltos/addon-controller@sha256:02db5aa429a0cccba8de913feb8564f969487c4126d1a2611da8c8e64ecc695d
+        image: docker.io/projectsveltos/addon-controller@sha256:dcde529890c9bc8b40e80c7d24906697cd9bb2f453086e5ef33df4975e0ffaa2
         livenessProbe:
           failureThreshold: 3
           httpGet:
