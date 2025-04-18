@@ -24,9 +24,10 @@ spec:
         - --capi-onboard-annotation=
         - --v=5
         - --version=main
+        - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager@sha256:fb81c10fe62269bab98b4f8609b76354c975e4ed44153b008e5004d6432d86e2
+        image: docker.io/projectsveltos/event-manager@sha256:c80085e365ea38200ac627b5bfa7e0305ff8b5557f66826f02ff9acffd25a726
         livenessProbe:
           failureThreshold: 3
           httpGet:

@@ -42,9 +42,10 @@ spec:
         - --capi-onboard-annotation=
         - --v=5
         - --version=main
+        - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/healthcheck-manager@sha256:d5da19ffc659dd5ae8e0edbd3d647cd85250e5df344e4fb6836a6422b07fbd1b
+        image: docker.io/projectsveltos/healthcheck-manager@sha256:1a6be33a6315e876f23706b416267d388c43be4c016661b6cb6da5c645bce443
         livenessProbe:
           failureThreshold: 3
           httpGet:
