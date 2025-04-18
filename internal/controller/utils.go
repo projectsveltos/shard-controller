@@ -255,7 +255,7 @@ func addTypeInformationToObject(scheme *runtime.Scheme, obj client.Object) {
 	}
 }
 
-func deployControllers(ctx context.Context, c client.Client, shardKey string,
+func deployControllers(ctx context.Context, c client.Client, shardKey string, //nolint: funlen // deploying sveltos controllers
 	agentInMgmtCluster bool, logger logr.Logger) error {
 
 	if shardKey == "" {
@@ -303,6 +303,13 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string,
 	}
 
 	eventManagerTemplate := controllerSharding.GetEventManagerTemplate()
+	if agentInMgmtCluster {
+		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
+		eventManagerTemplate, err = setOptions(eventManagerTemplate)
+		if err != nil {
+			return err
+		}
+	}
 	err = deployDeployment(ctx, c, eventManagerTemplate, shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create event-manager deployment %v", err))
@@ -310,6 +317,13 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string,
 	}
 
 	healthcheckManagerTemplate := controllerSharding.GetHealthCheckManagerTemplate()
+	if agentInMgmtCluster {
+		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
+		healthcheckManagerTemplate, err = setOptions(healthcheckManagerTemplate)
+		if err != nil {
+			return err
+		}
+	}
 	err = deployDeployment(ctx, c, healthcheckManagerTemplate, shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create healthcheck-manager deployment %v", err))
