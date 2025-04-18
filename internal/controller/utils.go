@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -468,14 +469,19 @@ func setOptions(deplTemplate []byte) ([]byte, error) {
 	}
 
 	for i := range depl.Spec.Template.Spec.Containers {
-		// Sveltos deployments use kube-rbac-proxy and the second
-		// controller is the one we need to modify
-		if depl.Spec.Template.Spec.Containers[i].Name != "kube-rbac-proxy" {
-			depl.Spec.Template.Spec.Containers[i].Args = append(
-				depl.Spec.Template.Spec.Containers[i].Args,
-				"--agent-in-mgmt-cluster")
-			break
+		for j := range depl.Spec.Template.Spec.Containers[i].Args {
+			args := &depl.Spec.Template.Spec.Containers[i].Args[j]
+			if strings.Contains(*args, "agent-in-mgmt-cluster") {
+				lastIdx := len(depl.Spec.Template.Spec.Containers[i].Args) - 1
+				depl.Spec.Template.Spec.Containers[i].Args[j] = depl.Spec.Template.Spec.Containers[i].Args[lastIdx]
+				depl.Spec.Template.Spec.Containers[i].Args = depl.Spec.Template.Spec.Containers[i].Args[:lastIdx]
+				break
+			}
 		}
+
+		depl.Spec.Template.Spec.Containers[i].Args = append(
+			depl.Spec.Template.Spec.Containers[i].Args,
+			"--agent-in-mgmt-cluster=true")
 	}
 
 	// Create a buffer to store the encoded JSON data.
