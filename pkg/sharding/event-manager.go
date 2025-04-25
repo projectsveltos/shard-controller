@@ -45,7 +45,7 @@ spec:
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager@sha256:6c98af3e91e067a7949c32e5078006cef4aa2857f41ee630ae00d1ef73463aa4
+        image: docker.io/projectsveltos/event-manager@sha256:f7cdf0756e86c068866e788ff574af3b2f866031b1326bcbb180c3ad9ab3bec6
         livenessProbe:
           failureThreshold: 3
           httpGet:
