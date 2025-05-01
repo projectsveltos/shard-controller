@@ -45,7 +45,7 @@ spec:
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/healthcheck-manager@sha256:0df31d059016a77a58da8531a18b828a475508e47b504948db1092b01d52b14f
+        image: docker.io/projectsveltos/healthcheck-manager@sha256:00ab996e7216fa883d25d3b3864d79fad78800c8a252c9fe1229737fd4bb8da4
         livenessProbe:
           failureThreshold: 3
           httpGet:
