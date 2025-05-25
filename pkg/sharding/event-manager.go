@@ -41,11 +41,11 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v0.55.0
+        - --version=main
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager@sha256:8b99d34e51d9ce12bde0f70bc39a8b4aaa53190e188bc9b248801ffd2965a20a
+        image: docker.io/projectsveltos/event-manager@sha256:90bb6038155c4f88d77da4b606ebb266c6b0f72b950cc4b2fee45a14de7b08e4
         livenessProbe:
           failureThreshold: 3
           httpGet:
