@@ -42,12 +42,12 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v0.57.1
+        - --version=v0.57.2
         - --registry=
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/classifier@sha256:17bc46cc382201eefb1d610cfea0d272d9149952c77f8fb8a6fff6eafaac9284
+        image: docker.io/projectsveltos/classifier@sha256:32be0d73cdcd2f116defabd51e94323ad56d7bbe11cec49b777a80157b47bc1d
         livenessProbe:
           failureThreshold: 3
           httpGet:
