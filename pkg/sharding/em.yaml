@@ -23,11 +23,11 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=main
+        - --version=v1.0.0-beta.0
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/event-manager@sha256:a5a78d444c3582b79fa36a3bd31638d7efd7715f517e7361f6ac8bcc29497fe3
+        image: docker.io/projectsveltos/event-manager@sha256:e0c1ed33d2be93b5789f3884e89c22adca7d9a0fbc6593f484ec5a22b934dcf9
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -66,5 +66,7 @@ spec:
             - ALL
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: event-manager
       terminationGracePeriodSeconds: 10
