@@ -24,7 +24,7 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.0.0
+        - --version=v1.0.1
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
@@ -37,7 +37,7 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
-        image: docker.io/projectsveltos/addon-controller@sha256:fb43a4a5da342c9c9066ed3ad34db73662a40780a66bf4e8af2abaf29d05a741
+        image: docker.io/projectsveltos/addon-controller@sha256:dcdcd564103e7cf9bb4f8db592df15122aea7a23de91d47fa289d8bd179b3c39
         livenessProbe:
           failureThreshold: 3
           httpGet:
