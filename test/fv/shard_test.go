@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
+	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
 	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
-	"github.com/projectsveltos/libsveltos/lib/sharding"
 	controllerSharding "github.com/projectsveltos/shard-controller/pkg/sharding"
 )
 
@@ -42,7 +42,7 @@ var _ = Describe("Shard", func() {
 		Expect(k8sClient.Get(context.TODO(),
 			types.NamespacedName{Namespace: kindWorkloadCluster.Namespace, Name: kindWorkloadCluster.Name},
 			currentCluster)).To(Succeed())
-		currentCluster.Annotations[sharding.ShardAnnotation] = shard
+		currentCluster.Annotations[libsveltosv1beta1.ShardAnnotation] = shard
 		Expect(k8sClient.Update(context.TODO(), currentCluster)).To(Succeed())
 
 		verifyAnnotation(shard)
@@ -55,7 +55,7 @@ var _ = Describe("Shard", func() {
 		Expect(k8sClient.Get(context.TODO(),
 			types.NamespacedName{Namespace: kindWorkloadCluster.Namespace, Name: kindWorkloadCluster.Name},
 			currentCluster)).To(Succeed())
-		currentCluster.Annotations[sharding.ShardAnnotation] = newShard
+		currentCluster.Annotations[libsveltosv1beta1.ShardAnnotation] = newShard
 		Expect(k8sClient.Update(context.TODO(), currentCluster)).To(Succeed())
 
 		Byf("Verifying projectsveltos deployments are created for shard %s", newShard)
@@ -68,7 +68,7 @@ var _ = Describe("Shard", func() {
 		Expect(k8sClient.Get(context.TODO(),
 			types.NamespacedName{Namespace: kindWorkloadCluster.Namespace, Name: kindWorkloadCluster.Name},
 			currentCluster)).To(Succeed())
-		currentCluster.Annotations[sharding.ShardAnnotation] = ""
+		currentCluster.Annotations[libsveltosv1beta1.ShardAnnotation] = ""
 		Expect(k8sClient.Update(context.TODO(), currentCluster)).To(Succeed())
 
 		Byf("Verifying projectsveltos deployments are gone for shard %s", newShard)
@@ -179,7 +179,7 @@ func verifyAnnotation(shard string) {
 	Expect(k8sClient.Get(context.TODO(),
 		types.NamespacedName{Namespace: kindWorkloadCluster.Namespace, Name: kindWorkloadCluster.Name},
 		currentCluster)).To(Succeed())
-	v, ok := currentCluster.Annotations[sharding.ShardAnnotation]
+	v, ok := currentCluster.Annotations[libsveltosv1beta1.ShardAnnotation]
 	Expect(ok).To(BeTrue())
 	Expect(v).To(Equal(shard))
 }

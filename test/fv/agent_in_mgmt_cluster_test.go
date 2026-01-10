@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
+	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
 	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
-	"github.com/projectsveltos/libsveltos/lib/sharding"
 	controllerSharding "github.com/projectsveltos/shard-controller/pkg/sharding"
 )
 
@@ -85,7 +85,7 @@ var _ = Describe("Agent in management cluster mode", Serial, func() {
 		Expect(k8sClient.Get(context.TODO(),
 			types.NamespacedName{Namespace: kindWorkloadCluster.Namespace, Name: kindWorkloadCluster.Name},
 			currentCluster)).To(Succeed())
-		currentCluster.Annotations[sharding.ShardAnnotation] = shard
+		currentCluster.Annotations[libsveltosv1beta1.ShardAnnotation] = shard
 		Expect(k8sClient.Update(context.TODO(), currentCluster)).To(Succeed())
 
 		verifyAnnotation(shard)
