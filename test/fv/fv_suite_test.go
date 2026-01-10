@@ -39,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
-	"github.com/projectsveltos/libsveltos/lib/sharding"
 )
 
 var (
@@ -151,7 +150,7 @@ var _ = BeforeSuite(func() {
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[sharding.ShardAnnotation] = ""
+		annotations[libsveltosv1beta1.ShardAnnotation] = ""
 		currentCluster.Annotations = annotations
 
 		return k8sClient.Update(context.TODO(), currentCluster)

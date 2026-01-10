@@ -35,7 +35,6 @@ import (
 
 	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
 	libsveltosset "github.com/projectsveltos/libsveltos/lib/set"
-	"github.com/projectsveltos/libsveltos/lib/sharding"
 	"github.com/projectsveltos/shard-controller/internal/controller"
 )
 
@@ -192,7 +191,7 @@ var _ = Describe("Utils", func() {
 				Namespace: randomString(),
 				Name:      randomString(),
 				Annotations: map[string]string{
-					sharding.ShardAnnotation: shardKey,
+					libsveltosv1beta1.ShardAnnotation: shardKey,
 				},
 			},
 		}
@@ -260,7 +259,7 @@ var _ = Describe("Utils", func() {
 				Namespace: randomString(),
 				Name:      randomString(),
 				Annotations: map[string]string{
-					sharding.ShardAnnotation: shardKey,
+					libsveltosv1beta1.ShardAnnotation: shardKey,
 				},
 			},
 		}

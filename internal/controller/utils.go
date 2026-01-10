@@ -44,7 +44,6 @@ import (
 	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
 	logs "github.com/projectsveltos/libsveltos/lib/logsettings"
 	libsveltosset "github.com/projectsveltos/libsveltos/lib/set"
-	"github.com/projectsveltos/libsveltos/lib/sharding"
 	controllerSharding "github.com/projectsveltos/shard-controller/pkg/sharding"
 )
 
@@ -124,7 +123,7 @@ func processCluster(ctx context.Context, config *rest.Config, c client.Client,
 	currentShard := ""
 	annotations := cluster.GetAnnotations()
 	if len(annotations) != 0 {
-		currentShard = annotations[sharding.ShardAnnotation]
+		currentShard = annotations[libsveltosv1beta1.ShardAnnotation]
 	}
 
 	return trackCluster(ctx, config, c, agentInMgmtCluster, clusterRef, currentShard, logger)
