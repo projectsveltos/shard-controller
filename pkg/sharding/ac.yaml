@@ -10,6 +10,8 @@ spec:
   selector:
     matchLabels:
       control-plane: addon-controller
+  strategy:
+    type: Recreate
   template:
     metadata:
       annotations:
@@ -24,7 +26,7 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.4.0
+        - --version=v1.5.0
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
@@ -37,7 +39,7 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
-        image: docker.io/projectsveltos/addon-controller@sha256:e097a3565575aa73ff83d2cca032bc32a24d45ac61584e9a9f3282d9fba5a149
+        image: docker.io/projectsveltos/addon-controller@sha256:4052cb3e8a251de2230782df16273207a1801c38aa1382b163707ccec6aa7a64
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -75,6 +77,12 @@ spec:
         volumeMounts:
         - mountPath: /tmp
           name: tmp
+      initContainers:
+      - env:
+        - name: IS_INITIALIZATION
+          value: "true"
+        image: docker.io/projectsveltos/addon-controller@sha256:4052cb3e8a251de2230782df16273207a1801c38aa1382b163707ccec6aa7a64
+        name: initialization
       securityContext:
         runAsNonRoot: true
       serviceAccountName: addon-controller
