@@ -23,11 +23,11 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.6.0
+        - --version=v1.7.0
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/healthcheck-manager@sha256:2bdb773bbe1282ce8fc551e118f9f65dbe9edef73414b2ba25af0747bfbb6c56
+        image: docker.io/projectsveltos/healthcheck-manager@sha256:33891e8c2edb6dfc50fcc8b7396cb1672c2e9cd67666a52bc0b56e0dc18f7b43
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -64,6 +64,8 @@ spec:
           capabilities:
             drop:
             - ALL
+          seccompProfile:
+            type: RuntimeDefault
       securityContext:
         runAsNonRoot: true
         seccompProfile:
