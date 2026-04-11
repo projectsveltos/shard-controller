@@ -42,7 +42,7 @@ spec:
         - --v=5
         command:
         - /manager
-        image: docker.io/projectsveltos/sveltoscluster-manager@sha256:d4ed6f926bc9954fc7175d643df431e78de34384cb19c2300270903f0ddfaa04
+        image: docker.io/projectsveltos/sveltoscluster-manager@sha256:363f40c413836e544e08c34b8dcf61ae289dced621b0811a6ddb100269b1b9fa
         livenessProbe:
           failureThreshold: 3
           httpGet:
