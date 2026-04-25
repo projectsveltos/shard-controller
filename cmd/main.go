@@ -46,7 +46,7 @@ import (
 
 	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
 	"github.com/projectsveltos/libsveltos/lib/crd"
-	"github.com/projectsveltos/libsveltos/lib/logsettings"
+	logs "github.com/projectsveltos/libsveltos/lib/logsettings"
 	"github.com/projectsveltos/shard-controller/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
@@ -118,7 +118,7 @@ func main() {
 	// Setup the context that's going to be used in controllers and for the manager.
 	ctx := ctrl.SetupSignalHandler()
 
-	logsettings.RegisterForLogSettings(ctx,
+	logs.RegisterForLogSettings(ctx,
 		libsveltosv1beta1.ComponentShardController, ctrl.Log.WithName("log-setter"),
 		ctrl.GetConfigOrDie())
 
@@ -203,7 +203,7 @@ func capiWatchers(ctx context.Context, mgr ctrl.Manager, logger logr.Logger) {
 	const maxRetries = 20
 	retries := 0
 	for {
-		capiPresent, err := isCAPIInstalled(ctx, mgr.GetClient())
+		capiPresent, err := isCAPIInstalled(ctx, mgr.GetClient(), logger)
 		if err != nil {
 			if retries < maxRetries {
 				logger.Info(fmt.Sprintf("failed to verify if CAPI is present: %v", err))
@@ -212,10 +212,10 @@ func capiWatchers(ctx context.Context, mgr ctrl.Manager, logger logr.Logger) {
 			retries++
 		} else {
 			if !capiPresent {
-				setupLog.V(logsettings.LogInfo).Info("CAPI currently not present. Starting CRD watcher")
+				setupLog.V(logs.LogInfo).Info("CAPI currently not present. Starting CRD watcher")
 				go crd.WatchCustomResourceDefinition(ctx, mgr.GetConfig(), capiCRDHandler, setupLog)
 			} else {
-				setupLog.V(logsettings.LogInfo).Info("CAPI present.")
+				setupLog.V(logs.LogInfo).Info("CAPI present.")
 				if err = (&controller.ClusterReconciler{
 					Config:             mgr.GetConfig(),
 					Client:             mgr.GetClient(),
@@ -232,8 +232,23 @@ func capiWatchers(ctx context.Context, mgr ctrl.Manager, logger logr.Logger) {
 	}
 }
 
-// isCAPIInstalled returns true if CAPI is installed, false otherwise
-func isCAPIInstalled(ctx context.Context, c client.Client) (bool, error) {
+// capiCRDHandler restarts process if a CAPI CRD is updated
+func capiCRDHandler(gvk *schema.GroupVersionKind, action crd.ChangeType) {
+	if action == crd.Modify {
+		return
+	}
+	if gvk.Group == clusterv1.GroupVersion.Group && gvk.Version == clusterv1.GroupVersion.Version {
+		setupLog.V(logs.LogInfo).Info("Initiating graceful restart due to CAPI CRD update",
+			"GVK", gvk.String(), "Action", string(action))
+
+		if killErr := syscall.Kill(syscall.Getpid(), syscall.SIGTERM); killErr != nil {
+			panic("kill -TERM failed")
+		}
+	}
+}
+
+// isCAPIInstalled returns true if CAPI is installed with v1beta2 served, false otherwise
+func isCAPIInstalled(ctx context.Context, c client.Client, logger logr.Logger) (bool, error) {
 	clusterCRD := &apiextensionsv1.CustomResourceDefinition{}
 
 	err := c.Get(ctx, types.NamespacedName{Name: "clusters.cluster.x-k8s.io"}, clusterCRD)
@@ -244,19 +259,14 @@ func isCAPIInstalled(ctx context.Context, c client.Client) (bool, error) {
 		return false, err
 	}
 
-	return true, nil
-}
-
-// capiCRDHandler restarts process if a CAPI CRD is updated
-func capiCRDHandler(gvk *schema.GroupVersionKind, action crd.ChangeType) {
-	if action == crd.Modify {
-		return
-	}
-	if gvk.Group == clusterv1.GroupVersion.Group {
-		if killErr := syscall.Kill(syscall.Getpid(), syscall.SIGTERM); killErr != nil {
-			panic("kill -TERM failed")
+	for _, version := range clusterCRD.Spec.Versions {
+		if version.Name == clusterv1.GroupVersion.Version && version.Served {
+			return true, nil
 		}
 	}
+
+	logger.V(logs.LogInfo).Info("clusterCRD CRD present but v1beta2 not served")
+	return false, nil
 }
 
 // getDiagnosticsOptions returns metrics options which can be used to configure a Manager.
