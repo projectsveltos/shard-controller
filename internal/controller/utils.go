@@ -499,6 +499,22 @@ func setOptions(deplTemplate []byte) ([]byte, error) {
 			"--agent-in-mgmt-cluster=true")
 	}
 
+	for i := range depl.Spec.Template.Spec.InitContainers {
+		for j := range depl.Spec.Template.Spec.InitContainers[i].Args {
+			args := &depl.Spec.Template.Spec.InitContainers[i].Args[j]
+			if strings.Contains(*args, "agent-in-mgmt-cluster") {
+				lastIdx := len(depl.Spec.Template.Spec.InitContainers[i].Args) - 1
+				depl.Spec.Template.Spec.InitContainers[i].Args[j] = depl.Spec.Template.Spec.InitContainers[i].Args[lastIdx]
+				depl.Spec.Template.Spec.InitContainers[i].Args = depl.Spec.Template.Spec.InitContainers[i].Args[:lastIdx]
+				break
+			}
+		}
+
+		depl.Spec.Template.Spec.InitContainers[i].Args = append(
+			depl.Spec.Template.Spec.InitContainers[i].Args,
+			"--agent-in-mgmt-cluster=true")
+	}
+
 	// Create a buffer to store the encoded JSON data.
 	buffer := bytes.NewBuffer([]byte{})
 

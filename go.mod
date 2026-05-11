@@ -1,6 +1,6 @@
 module github.com/projectsveltos/shard-controller
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/TwiN/go-color v1.4.1
@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectsveltos/libsveltos v1.9.0
 	github.com/spf13/pflag v1.0.10
-	golang.org/x/text v0.36.0
+	golang.org/x/text v0.37.0
 	k8s.io/api v0.36.0
 	k8s.io/apiextensions-apiserver v0.36.0
 	k8s.io/apimachinery v0.36.0
