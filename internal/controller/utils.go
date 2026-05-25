@@ -101,11 +101,18 @@ func InitScheme() (*runtime.Scheme, error) {
 func processCluster(ctx context.Context, config *rest.Config, c client.Client,
 	agentInMgmtCluster bool, cluster client.Object, req ctrl.Request, logger logr.Logger) error {
 
-	clusterRef := getObjectReferenceFromObject(c.Scheme(), cluster)
-
 	if err := c.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
-			return stopTrackingCluster(ctx, config, clusterRef, logger)
+			// cluster is empty here; derive the GVK from the scheme so the ref is complete.
+			addTypeInformationToObject(c.Scheme(), cluster)
+			apiVersion, kind := cluster.GetObjectKind().GroupVersionKind().ToAPIVersionAndKind()
+			notFoundRef := &corev1.ObjectReference{
+				Namespace:  req.Namespace,
+				Name:       req.Name,
+				Kind:       kind,
+				APIVersion: apiVersion,
+			}
+			return stopTrackingCluster(ctx, config, notFoundRef, logger)
 		}
 		logger.Error(err, "Failed to fetch cluster")
 		return errors.Wrapf(
@@ -114,6 +121,9 @@ func processCluster(ctx context.Context, config *rest.Config, c client.Client,
 			cluster.GetObjectKind().GroupVersionKind().Kind, req.NamespacedName,
 		)
 	}
+
+	// clusterRef is computed after Get so namespace/name are populated.
+	clusterRef := getObjectReferenceFromObject(c.Scheme(), cluster)
 
 	// Handle deleted cluster
 	if !cluster.GetDeletionTimestamp().IsZero() {
@@ -145,13 +155,13 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client, age
 	mux.Lock()
 	defer mux.Unlock()
 
-	oldShard, ok := clusterMap[*cluster]
-	if ok && oldShard == currentShardKey {
+	oldShard, alreadyTracked := clusterMap[*cluster]
+	if alreadyTracked && oldShard == currentShardKey {
 		// Cluster is already tracked. And cluster shard has not changed.
 		return nil
 	}
 
-	if ok {
+	if alreadyTracked {
 		if shardMap[oldShard].Has(cluster) &&
 			shardMap[oldShard].Len() == 1 {
 			// By removing cluster, no more clusters will match oldShard.
@@ -167,6 +177,8 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client, age
 		clusterPerShard := shardMap[oldShard]
 		clusterPerShard.Erase(cluster)
 		shardMap[oldShard] = clusterPerShard
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("removed cluster from shard %q: %d cluster(s) remaining",
+			oldShard, clusterPerShard.Len()))
 	}
 
 	// Update Cluster shard (key: cluster; value: cluster current shard)
@@ -189,6 +201,8 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client, age
 	}
 	clusterPerShard.Insert(cluster)
 	shardMap[currentShardKey] = clusterPerShard
+	logger.V(logs.LogInfo).Info(fmt.Sprintf("added cluster to shard %q: %d cluster(s) total",
+		currentShardKey, clusterPerShard.Len()))
 
 	return nil
 }
@@ -217,6 +231,8 @@ func stopTrackingCluster(ctx context.Context, config *rest.Config, cluster *core
 					fmt.Sprintf("no more clusters matching shard %s. Removing controllers", oldShardKey))
 				return undeployControllers(ctx, config, oldShardKey, logger)
 			}
+			logger.V(logs.LogInfo).Info(fmt.Sprintf("removed cluster from shard %q: %d cluster(s) remaining",
+				oldShardKey, shardMap[oldShardKey].Len()))
 		}
 	}
 
@@ -480,6 +496,22 @@ func setOptions(deplTemplate []byte) ([]byte, error) {
 
 		depl.Spec.Template.Spec.Containers[i].Args = append(
 			depl.Spec.Template.Spec.Containers[i].Args,
+			"--agent-in-mgmt-cluster=true")
+	}
+
+	for i := range depl.Spec.Template.Spec.InitContainers {
+		for j := range depl.Spec.Template.Spec.InitContainers[i].Args {
+			args := &depl.Spec.Template.Spec.InitContainers[i].Args[j]
+			if strings.Contains(*args, "agent-in-mgmt-cluster") {
+				lastIdx := len(depl.Spec.Template.Spec.InitContainers[i].Args) - 1
+				depl.Spec.Template.Spec.InitContainers[i].Args[j] = depl.Spec.Template.Spec.InitContainers[i].Args[lastIdx]
+				depl.Spec.Template.Spec.InitContainers[i].Args = depl.Spec.Template.Spec.InitContainers[i].Args[:lastIdx]
+				break
+			}
+		}
+
+		depl.Spec.Template.Spec.InitContainers[i].Args = append(
+			depl.Spec.Template.Spec.InitContainers[i].Args,
 			"--agent-in-mgmt-cluster=true")
 	}
 
