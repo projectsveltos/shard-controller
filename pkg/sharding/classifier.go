@@ -42,12 +42,25 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.10.0
+        - --version=main
         - --registry=
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
-        image: docker.io/projectsveltos/classifier@sha256:b690a710e847fad71ab573cdea8872cc1488512f6ca2f375a036e0a33335c0b0
+        env:
+        - name: TOTAL_MEMORY_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: docker.io/projectsveltos/classifier@sha256:e835c4736a93940ee80b0e5e84e02429ed6c8bb01d6eced6854602c571755943
         livenessProbe:
           failureThreshold: 3
           httpGet:

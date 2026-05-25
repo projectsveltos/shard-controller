@@ -302,7 +302,7 @@ var _ = Describe("Utils", func() {
 	It("deployDeployment deploys a deployment", func() {
 		namespace := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: randomString(),
+				Name: sveltosNamespace,
 			},
 		}
 
@@ -314,7 +314,8 @@ var _ = Describe("Utils", func() {
 
 		shard := "shard1"
 		nginxDeployment := fmt.Sprintf(nginxDeploymentTemplate, namespace.Name)
-		Expect(controller.DeployDeployment(context.TODO(), c, []byte(nginxDeployment), shard)).To(Succeed())
+		Expect(controller.DeployDeployment(context.TODO(), c, []byte(nginxDeployment),
+			sveltosNamespace, shard)).To(Succeed())
 
 		deploymentList := &appsv1.DeploymentList{}
 		listOptions := []client.ListOption{
@@ -328,7 +329,7 @@ var _ = Describe("Utils", func() {
 	It("deployControllers deploys projectsveltos controllers for a given shard", func() {
 		namespace := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: projectsveltoNs,
+				Name: sveltosNamespace,
 			},
 		}
 
@@ -355,7 +356,7 @@ var _ = Describe("Utils", func() {
 	It("deployControllers deploys projectsveltos controllers passing agent-in-mgmt-cluster option", func() {
 		deploymentList := &appsv1.DeploymentList{}
 		listOptions := []client.ListOption{
-			client.InNamespace(projectsveltoNs),
+			client.InNamespace(sveltosNamespace),
 		}
 
 		Expect(testEnv.List(context.TODO(), deploymentList, listOptions...)).To(Succeed())
@@ -378,7 +379,7 @@ var _ = Describe("Utils", func() {
 
 	It("undeployControllers undeploys projectsveltos controllers for a given shard", func() {
 		listOptions := []client.ListOption{
-			client.InNamespace(projectsveltoNs),
+			client.InNamespace(sveltosNamespace),
 		}
 
 		deploymentList := &appsv1.DeploymentList{}
