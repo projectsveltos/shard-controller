@@ -35,7 +35,6 @@ import (
 )
 
 const (
-	shardControllerNs     = "projectsveltos"
 	shardControllerName   = "shard-controller"
 	agentInMgmtClusterArg = "--agent-in-mgmt-cluster"
 	kubeRbacProxy         = "kube-rbac-proxy"
@@ -46,7 +45,7 @@ var _ = Describe("Agent in management cluster mode", Serial, func() {
 		shardController := &appsv1.Deployment{}
 
 		Expect(k8sClient.Get(context.TODO(),
-			types.NamespacedName{Namespace: shardControllerNs, Name: shardControllerName},
+			types.NamespacedName{Namespace: sveltosNamespace, Name: shardControllerName},
 			shardController)).To(Succeed())
 
 		for i := range shardController.Spec.Template.Spec.Containers {
@@ -62,7 +61,7 @@ var _ = Describe("Agent in management cluster mode", Serial, func() {
 		shardController := &appsv1.Deployment{}
 
 		Expect(k8sClient.Get(context.TODO(),
-			types.NamespacedName{Namespace: shardControllerNs, Name: shardControllerName},
+			types.NamespacedName{Namespace: sveltosNamespace, Name: shardControllerName},
 			shardController)).To(Succeed())
 
 		updated := false
