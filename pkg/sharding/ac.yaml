@@ -26,7 +26,7 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.10.0
+        - --version=main
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
@@ -39,7 +39,11 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
-        image: docker.io/projectsveltos/addon-controller@sha256:71e391b8d3f72185462037c13d112e677cf3f61c9e6dc305e61681eba2e88932
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: docker.io/projectsveltos/addon-controller@sha256:01ceda7b6986c59c5ca397b9115e625d9258f79b50d03f0e9d62f8f76a899d9a
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -83,9 +87,21 @@ spec:
         - --shard-key={{.SHARD}}
         - --agent-in-mgmt-cluster=false
         env:
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: IS_INITIALIZATION
           value: "true"
-        image: docker.io/projectsveltos/addon-controller@sha256:71e391b8d3f72185462037c13d112e677cf3f61c9e6dc305e61681eba2e88932
+        image: docker.io/projectsveltos/addon-controller@sha256:01ceda7b6986c59c5ca397b9115e625d9258f79b50d03f0e9d62f8f76a899d9a
         name: initialization
         securityContext:
           allowPrivilegeEscalation: false

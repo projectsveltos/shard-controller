@@ -46,14 +46,14 @@ import (
 const (
 	timeout         = 1 * time.Minute
 	pollingInterval = 5 * time.Second
-	projectsveltoNs = "projectsveltos"
 )
 
 var (
-	testEnv *helpers.TestEnvironment
-	cancel  context.CancelFunc
-	ctx     context.Context
-	scheme  *runtime.Scheme
+	testEnv          *helpers.TestEnvironment
+	cancel           context.CancelFunc
+	ctx              context.Context
+	scheme           *runtime.Scheme
+	sveltosNamespace string
 )
 
 func TestController(t *testing.T) {
@@ -93,11 +93,13 @@ var _ = BeforeSuite(func() {
 	Expect(testEnv.Create(context.TODO(), sveltosCRD)).To(Succeed())
 	Expect(waitForObject(context.TODO(), testEnv, sveltosCRD)).To(Succeed())
 
+	sveltosNamespace = randomString()
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: projectsveltoNs,
+			Name: sveltosNamespace,
 		},
 	}
+	controller.SetSveltosNamespace(sveltosNamespace)
 
 	Expect(testEnv.Create(context.TODO(), namespace)).To(Succeed())
 	Expect(waitForObject(context.TODO(), testEnv.Client, namespace)).To(Succeed())

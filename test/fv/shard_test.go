@@ -79,31 +79,32 @@ var _ = Describe("Shard", func() {
 func verifyDeploymentPresence(shardKey string) {
 	By("Verify addon-controller deployment")
 	addonControllerTemplate := controllerSharding.GetAddonControllerTemplate()
-	verifyDeployment(addonControllerTemplate, shardKey)
+	verifyDeployment(addonControllerTemplate, sveltosNamespace, shardKey)
 
 	By("Verify classifier deployment")
 	classifierTemplate := controllerSharding.GetClassifierTemplate()
-	verifyDeployment(classifierTemplate, shardKey)
+	verifyDeployment(classifierTemplate, sveltosNamespace, shardKey)
 
 	By("Verify event-manager deployment")
 	eventManagerTemplate := controllerSharding.GetEventManagerTemplate()
-	verifyDeployment(eventManagerTemplate, shardKey)
+	verifyDeployment(eventManagerTemplate, sveltosNamespace, shardKey)
 
 	By("Verify healtchcheck-manager deployment")
 	healthCheckTemplate := controllerSharding.GetHealthCheckManagerTemplate()
-	verifyDeployment(healthCheckTemplate, shardKey)
+	verifyDeployment(healthCheckTemplate, sveltosNamespace, shardKey)
 
 	By("Verify sveltos-cluster deployment")
 	sveltosClusterTemplate := controllerSharding.GetSveltosClusterManagerTemplate()
-	verifyDeployment(sveltosClusterTemplate, shardKey)
+	verifyDeployment(sveltosClusterTemplate, sveltosNamespace, shardKey)
 }
 
-func verifyDeployment(deplTemplate []byte, shardKey string) {
+func verifyDeployment(deplTemplate []byte, sveltosNamespace, shardKey string) {
 	data, err := instantiateTemplate(deplTemplate, shardKey)
 	Expect(err).To(BeNil())
 
 	deployment, err := k8s_utils.GetUnstructured(data)
 	Expect(err).To(BeNil())
+	deployment.SetNamespace(sveltosNamespace)
 
 	Eventually(func() bool {
 		currentDeployment := &appsv1.Deployment{}

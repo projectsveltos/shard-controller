@@ -291,7 +291,7 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 			return err
 		}
 	}
-	err = deployDeployment(ctx, c, addonControllerTemplate, shardKey)
+	err = deployDeployment(ctx, c, addonControllerTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create addon-controller deployment %v", err))
 		return err
@@ -305,14 +305,14 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 			return err
 		}
 	}
-	err = deployDeployment(ctx, c, classifierTemplate, shardKey)
+	err = deployDeployment(ctx, c, classifierTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create classifier deployment %v", err))
 		return err
 	}
 
 	sveltosClusterTemplate := controllerSharding.GetSveltosClusterManagerTemplate()
-	err = deployDeployment(ctx, c, sveltosClusterTemplate, shardKey)
+	err = deployDeployment(ctx, c, sveltosClusterTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create sveltoscluster-manager deployment %v", err))
 		return err
@@ -326,7 +326,7 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 			return err
 		}
 	}
-	err = deployDeployment(ctx, c, eventManagerTemplate, shardKey)
+	err = deployDeployment(ctx, c, eventManagerTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create event-manager deployment %v", err))
 		return err
@@ -340,7 +340,7 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 			return err
 		}
 	}
-	err = deployDeployment(ctx, c, healthcheckManagerTemplate, shardKey)
+	err = deployDeployment(ctx, c, healthcheckManagerTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create healthcheck-manager deployment %v", err))
 		return err
@@ -359,35 +359,35 @@ func undeployControllers(ctx context.Context, config *rest.Config, shardKey stri
 	logger.V(logs.LogDebug).Info("undeploy projectsveltos controllers for shard")
 
 	addonControllerTemplate := controllerSharding.GetAddonControllerTemplate()
-	err := undeployDeployment(ctx, config, addonControllerTemplate, shardKey)
+	err := undeployDeployment(ctx, config, addonControllerTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create addon-controller deployment %v", err))
 		return err
 	}
 
 	classifierTemplate := controllerSharding.GetClassifierTemplate()
-	err = undeployDeployment(ctx, config, classifierTemplate, shardKey)
+	err = undeployDeployment(ctx, config, classifierTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create classifier deployment %v", err))
 		return err
 	}
 
 	sveltosClusterTemplate := controllerSharding.GetSveltosClusterManagerTemplate()
-	err = undeployDeployment(ctx, config, sveltosClusterTemplate, shardKey)
+	err = undeployDeployment(ctx, config, sveltosClusterTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create sveltoscluster-manager deployment %v", err))
 		return err
 	}
 
 	eventManagerTemplate := controllerSharding.GetEventManagerTemplate()
-	err = undeployDeployment(ctx, config, eventManagerTemplate, shardKey)
+	err = undeployDeployment(ctx, config, eventManagerTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create event-manager deployment %v", err))
 		return err
 	}
 
 	healthcheckManagerTemplate := controllerSharding.GetHealthCheckManagerTemplate()
-	err = undeployDeployment(ctx, config, healthcheckManagerTemplate, shardKey)
+	err = undeployDeployment(ctx, config, healthcheckManagerTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create healthcheck-manager deployment %v", err))
 		return err
@@ -397,7 +397,7 @@ func undeployControllers(ctx context.Context, config *rest.Config, shardKey stri
 }
 
 func deployDeployment(ctx context.Context, c client.Client,
-	deploymentTemplate []byte, shardKey string) error {
+	deploymentTemplate []byte, sveltosNamespace, shardKey string) error {
 
 	data, err := instantiateTemplate(deploymentTemplate, shardKey)
 	if err != nil {
@@ -408,6 +408,7 @@ func deployDeployment(ctx context.Context, c client.Client,
 	if err != nil {
 		return err
 	}
+	deployment.SetNamespace(sveltosNamespace)
 
 	err = c.Create(ctx, deployment)
 	if err != nil {
@@ -422,7 +423,7 @@ func deployDeployment(ctx context.Context, c client.Client,
 }
 
 func undeployDeployment(ctx context.Context, config *rest.Config,
-	deploymentTemplate []byte, shardKey string) error {
+	deploymentTemplate []byte, sveltosNamespace, shardKey string) error {
 
 	data, err := instantiateTemplate(deploymentTemplate, shardKey)
 	if err != nil {
@@ -433,6 +434,7 @@ func undeployDeployment(ctx context.Context, config *rest.Config,
 	if err != nil {
 		return err
 	}
+	deployment.SetNamespace(sveltosNamespace)
 
 	// Use clientset instead of client. client, even when passing namespace, requires
 	// list permissions at cluster level
