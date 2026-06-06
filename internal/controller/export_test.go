@@ -16,14 +16,50 @@ limitations under the License.
 
 package controller
 
+import (
+	"context"
+
+	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
+)
+
 var (
 	TrackCluster        = trackCluster
 	StopTrackingCluster = stopTrackingCluster
 	ProcessCluster      = processCluster
-	DeployDeployment    = deployDeployment
 	DeployControllers   = deployControllers
 	UndeployControllers = undeployControllers
+	RedeployAllShards   = redeployAllShards
+
+	GetPatchesFromConfigMap = getPatchesFromConfigMap
+	ApplyShardPatches       = applyShardPatches
 
 	ClusterMap = &clusterMap
 	ShardMap   = &shardMap
 )
+
+// DeployDeployment exposes deployDeployment for tests with no patches.
+func DeployDeployment(ctx context.Context, c client.Client, deploymentTemplate []byte,
+	sveltosNamespace, shardKey string) error {
+
+	return deployDeployment(ctx, c, deploymentTemplate, sveltosNamespace, shardKey, nil, logr.Discard())
+}
+
+// DeployDeploymentWithPatches exposes the full deployDeployment signature for patch-aware tests.
+func DeployDeploymentWithPatches(ctx context.Context, c client.Client, deploymentTemplate []byte,
+	sveltosNamespace, shardKey string, patches []libsveltosv1beta1.Patch, logger logr.Logger) error {
+
+	return deployDeployment(ctx, c, deploymentTemplate, sveltosNamespace, shardKey, patches, logger)
+}
+
+// GetShardComponentsPatches exposes getShardComponentsPatches for tests.
+func GetShardComponentsPatches(ctx context.Context, c client.Client, logger logr.Logger,
+) ([]libsveltosv1beta1.Patch, error) {
+
+	return getShardComponentsPatches(ctx, c, logger)
+}
+
+// SetShardComponentsConfigMapForTest lets tests set the ConfigMap name without going through main.
+var SetShardComponentsConfigMapForTest = SetShardComponentsConfigMap

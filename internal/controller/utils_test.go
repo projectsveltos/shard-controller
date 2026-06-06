@@ -34,8 +34,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
+	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
 	libsveltosset "github.com/projectsveltos/libsveltos/lib/set"
 	"github.com/projectsveltos/shard-controller/internal/controller"
+)
+
+const (
+	// simplePatchYAML is a minimal patch entry used across multiple test cases.
+	simplePatchYAML = `patch: '[{"op":"add","path":"/metadata/labels/k","value":"v"}]'`
 )
 
 var (
@@ -607,6 +613,186 @@ var _ = Describe("Utils", func() {
 			Expect(arg).ToNot(ContainSubstring("--sveltos-applier-config"),
 				"classifier should not have --sveltos-applier-config arg when not provided")
 		}
+	})
+
+	Context("getPatchesFromConfigMap", func() {
+		It("returns empty slice for empty ConfigMap data", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: randomString(), Namespace: sveltosNamespace},
+			}
+			patches, err := controller.GetPatchesFromConfigMap(cm, logger)
+			Expect(err).To(BeNil())
+			Expect(patches).To(BeEmpty())
+		})
+
+		It("defaults target to apps/v1 Deployment when Target is nil", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: randomString(), Namespace: sveltosNamespace},
+				Data:       map[string]string{"p": simplePatchYAML},
+			}
+			patches, err := controller.GetPatchesFromConfigMap(cm, logger)
+			Expect(err).To(BeNil())
+			Expect(patches).To(HaveLen(1))
+			Expect(patches[0].Target).ToNot(BeNil())
+			Expect(patches[0].Target.Group).To(Equal("apps"))
+			Expect(patches[0].Target.Kind).To(Equal("Deployment"))
+		})
+
+		It("preserves an explicit target when provided", func() {
+			patchYAML := "patch: '[{\"op\":\"add\",\"path\":\"/metadata/labels/k\",\"value\":\"v\"}]'\ntarget:\n  kind: ConfigMap\n  group: \"\"\n"
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: randomString(), Namespace: sveltosNamespace},
+				Data:       map[string]string{"p": patchYAML},
+			}
+			patches, err := controller.GetPatchesFromConfigMap(cm, logger)
+			Expect(err).To(BeNil())
+			Expect(patches).To(HaveLen(1))
+			Expect(patches[0].Target.Kind).To(Equal("ConfigMap"))
+			Expect(patches[0].Target.Group).To(Equal(""))
+		})
+
+		It("parses multiple patches from multiple data keys", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: randomString(), Namespace: sveltosNamespace},
+				Data: map[string]string{
+					"patch1": simplePatchYAML,
+					"patch2": simplePatchYAML,
+				},
+			}
+			patches, err := controller.GetPatchesFromConfigMap(cm, logger)
+			Expect(err).To(BeNil())
+			Expect(patches).To(HaveLen(2))
+		})
+
+		It("returns error when patch field is empty", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: randomString(), Namespace: sveltosNamespace},
+				Data:       map[string]string{"p": "target:\n  kind: Deployment\n"},
+			}
+			_, err := controller.GetPatchesFromConfigMap(cm, logger)
+			Expect(err).ToNot(BeNil())
+		})
+
+		It("returns error for invalid YAML", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: randomString(), Namespace: sveltosNamespace},
+				Data:       map[string]string{"p": "patch: [unclosed"},
+			}
+			_, err := controller.GetPatchesFromConfigMap(cm, logger)
+			Expect(err).ToNot(BeNil())
+		})
+	})
+
+	Context("applyShardPatches", func() {
+		It("returns original bytes unchanged when patches is empty", func() {
+			original := []byte(fmt.Sprintf(nginxDeploymentTemplate, sveltosNamespace))
+			result, err := controller.ApplyShardPatches(original, nil, logger)
+			Expect(err).To(BeNil())
+			Expect(result).To(Equal(original))
+		})
+
+		It("applies a JSON6902 patch that matches the deployment", func() {
+			deployYAML := []byte(fmt.Sprintf(nginxDeploymentTemplate, sveltosNamespace))
+			patches := []libsveltosv1beta1.Patch{
+				{
+					Patch:  `[{"op":"add","path":"/metadata/labels/injected","value":"yes"}]`,
+					Target: &libsveltosv1beta1.PatchSelector{Group: "apps", Kind: "Deployment"},
+				},
+			}
+			result, err := controller.ApplyShardPatches(deployYAML, patches, logger)
+			Expect(err).To(BeNil())
+			u, err := k8s_utils.GetUnstructured(result)
+			Expect(err).To(BeNil())
+			Expect(u.GetLabels()).To(HaveKeyWithValue("injected", "yes"))
+		})
+
+		It("leaves the deployment unchanged when the patch targets a different kind", func() {
+			deployYAML := []byte(fmt.Sprintf(nginxDeploymentTemplate, sveltosNamespace))
+			patches := []libsveltosv1beta1.Patch{
+				{
+					Patch:  `[{"op":"add","path":"/metadata/labels/injected","value":"yes"}]`,
+					Target: &libsveltosv1beta1.PatchSelector{Group: "", Kind: "ConfigMap"},
+				},
+			}
+			result, err := controller.ApplyShardPatches(deployYAML, patches, logger)
+			Expect(err).To(BeNil())
+			u, err := k8s_utils.GetUnstructured(result)
+			Expect(err).To(BeNil())
+			Expect(u.GetLabels()).ToNot(HaveKey("injected"))
+		})
+	})
+
+	Context("getShardComponentsPatches", func() {
+		AfterEach(func() {
+			controller.SetShardComponentsConfigMapForTest("")
+		})
+
+		It("returns nil when no ConfigMap name is configured", func() {
+			controller.SetShardComponentsConfigMapForTest("")
+			c := fake.NewClientBuilder().WithScheme(scheme).Build()
+			patches, err := controller.GetShardComponentsPatches(context.TODO(), c, logger)
+			Expect(err).To(BeNil())
+			Expect(patches).To(BeNil())
+		})
+
+		It("returns nil when the named ConfigMap does not exist", func() {
+			controller.SetShardComponentsConfigMapForTest(randomString())
+			c := fake.NewClientBuilder().WithScheme(scheme).Build()
+			patches, err := controller.GetShardComponentsPatches(context.TODO(), c, logger)
+			Expect(err).To(BeNil())
+			Expect(patches).To(BeNil())
+		})
+
+		It("returns parsed patches when the ConfigMap exists", func() {
+			cmName := randomString()
+			controller.SetShardComponentsConfigMapForTest(cmName)
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: cmName, Namespace: sveltosNamespace},
+				Data:       map[string]string{"p": simplePatchYAML},
+			}
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+			patches, err := controller.GetShardComponentsPatches(context.TODO(), c, logger)
+			Expect(err).To(BeNil())
+			Expect(patches).To(HaveLen(1))
+			Expect(patches[0].Target.Group).To(Equal("apps"))
+			Expect(patches[0].Target.Kind).To(Equal("Deployment"))
+		})
+	})
+
+	Context("redeployAllShards", func() {
+		BeforeEach(func() {
+			controller.InitMaps()
+		})
+
+		It("does nothing when no active shards exist", func() {
+			c := fake.NewClientBuilder().WithScheme(scheme).Build()
+			Expect(controller.RedeployAllShards(context.TODO(), c, false, "", "", "", logger)).To(Succeed())
+
+			deploymentList := &appsv1.DeploymentList{}
+			Expect(c.List(context.TODO(), deploymentList)).To(Succeed())
+			Expect(deploymentList.Items).To(BeEmpty())
+		})
+
+		It("deploys controllers for each active shard", func() {
+			namespace := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: sveltosNamespace},
+			}
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(namespace).Build()
+
+			shardKey := randomString()
+			clusterRef := getClusterRef()
+			clusters := &libsveltosset.Set{}
+			clusters.Insert(clusterRef)
+			(*controller.ShardMap)[shardKey] = clusters
+			(*controller.ClusterMap)[*clusterRef] = shardKey
+
+			Expect(controller.RedeployAllShards(context.TODO(), c, false, "", "", "", logger)).To(Succeed())
+
+			deploymentList := &appsv1.DeploymentList{}
+			Expect(c.List(context.TODO(), deploymentList, client.InNamespace(sveltosNamespace))).To(Succeed())
+			const expectedDeployments = 5
+			Expect(deploymentList.Items).To(HaveLen(expectedDeployments))
+		})
 	})
 })
 

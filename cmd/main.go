@@ -28,8 +28,10 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -52,20 +54,21 @@ import (
 )
 
 var (
-	setupLog             = ctrl.Log.WithName("setup")
-	diagnosticsAddress   string
-	insecureDiagnostics  bool
-	agentInMgmtCluster   bool
-	driftDetectionConfig string
-	sveltosAgentConfig   string
-	sveltosApplierConfig string
-	reportMode           controller.ReportMode
-	tmpReportMode        int
-	restConfigQPS        float32
-	restConfigBurst      int
-	webhookPort          int
-	syncPeriod           time.Duration
-	healthAddr           string
+	setupLog                 = ctrl.Log.WithName("setup")
+	diagnosticsAddress       string
+	insecureDiagnostics      bool
+	agentInMgmtCluster       bool
+	driftDetectionConfig     string
+	sveltosAgentConfig       string
+	sveltosApplierConfig     string
+	reportMode               controller.ReportMode
+	tmpReportMode            int
+	restConfigQPS            float32
+	restConfigBurst          int
+	webhookPort              int
+	syncPeriod               time.Duration
+	healthAddr               string
+	shardComponentsConfigMap string
 )
 
 const (
@@ -95,6 +98,10 @@ func main() {
 
 	reportMode = controller.ReportMode(tmpReportMode)
 
+	sveltosNamespace := getSveltosNamespace()
+	controller.SetSveltosNamespace(sveltosNamespace)
+	controller.SetShardComponentsConfigMap(shardComponentsConfigMap)
+
 	ctrlOptions := ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                getDiagnosticsOptions(),
@@ -105,6 +112,7 @@ func main() {
 			}),
 		Cache: cache.Options{
 			SyncPeriod: &syncPeriod,
+			ByObject:   configMapCacheOptions(sveltosNamespace, shardComponentsConfigMap),
 		},
 	}
 
@@ -117,9 +125,6 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
-	sveltosNamespace := getSveltosNamespace()
-	controller.SetSveltosNamespace(sveltosNamespace)
 
 	// Setup the context that's going to be used in controllers and for the manager.
 	ctx := ctrl.SetupSignalHandler()
@@ -140,6 +145,20 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SveltosCluster")
 		os.Exit(1)
+	}
+
+	if shardComponentsConfigMap != "" {
+		if err = (&controller.ConfigMapReconciler{
+			Client:               mgr.GetClient(),
+			Scheme:               mgr.GetScheme(),
+			AgentInMgmtCluster:   agentInMgmtCluster,
+			DriftDetectionConfig: driftDetectionConfig,
+			SveltosAgentConfig:   sveltosAgentConfig,
+			SveltosApplierConfig: sveltosApplierConfig,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ConfigMap")
+			os.Exit(1)
+		}
 	}
 
 	go capiWatchers(ctx, mgr, setupLog)
@@ -191,6 +210,9 @@ func initFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&healthAddr, "health-addr", ":9440",
 		"The address the health endpoint binds to.")
+
+	fs.StringVar(&shardComponentsConfigMap, "shard-components-config", "",
+		"The name of the ConfigMap in the projectsveltos namespace containing patches for components deployed by shard-controller")
 
 	const defautlRestConfigQPS = 20
 	fs.Float32Var(&restConfigQPS, "kube-api-qps", defautlRestConfigQPS,
@@ -314,6 +336,24 @@ func getDiagnosticsOptions() metricsserver.Options {
 		BindAddress:    diagnosticsAddress,
 		SecureServing:  true,
 		FilterProvider: filters.WithAuthenticationAndAuthorization,
+	}
+}
+
+// configMapCacheOptions restricts the manager's ConfigMap informer to the single named ConfigMap
+// in the Sveltos namespace, avoiding a cluster-wide ConfigMap cache.
+// Returns nil when no ConfigMap name is configured (no informer is registered at all).
+func configMapCacheOptions(sveltosNamespace, configMapName string) map[client.Object]cache.ByObject {
+	if configMapName == "" {
+		return nil
+	}
+	return map[client.Object]cache.ByObject{
+		&corev1.ConfigMap{}: {
+			Namespaces: map[string]cache.Config{
+				sveltosNamespace: {
+					FieldSelector: fields.OneTermEqualSelector("metadata.name", configMapName),
+				},
+			},
+		},
 	}
 }
 

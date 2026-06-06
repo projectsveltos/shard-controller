@@ -32,17 +32,21 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
 	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
 	logs "github.com/projectsveltos/libsveltos/lib/logsettings"
+	"github.com/projectsveltos/libsveltos/lib/patcher"
 	libsveltosset "github.com/projectsveltos/libsveltos/lib/set"
 	controllerSharding "github.com/projectsveltos/shard-controller/pkg/sharding"
 )
@@ -54,12 +58,22 @@ var (
 	shardMap map[string]*libsveltosset.Set
 
 	mux sync.RWMutex
+
+	shardComponentsConfigMap string
 )
 
 func InitMaps() {
 	clusterMap = map[corev1.ObjectReference]string{}
 	shardMap = map[string]*libsveltosset.Set{}
 	mux = sync.RWMutex{}
+}
+
+func SetShardComponentsConfigMap(name string) {
+	shardComponentsConfigMap = name
+}
+
+func getShardComponentsConfigMap() string {
+	return shardComponentsConfigMap
 }
 
 type ReportMode int
@@ -283,7 +297,11 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 	logger = logger.WithValues("shard", shardKey)
 	logger.V(logs.LogDebug).Info("deploy projectsveltos controllers for shard")
 
-	var err error
+	patches, err := getShardComponentsPatches(ctx, c, logger)
+	if err != nil {
+		return err
+	}
+
 	addonControllerTemplate := controllerSharding.GetAddonControllerTemplate()
 	if agentInMgmtCluster {
 		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
@@ -296,9 +314,9 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 	if err != nil {
 		return err
 	}
-	err = deployDeployment(ctx, c, addonControllerTemplate, getSveltosNamespace(), shardKey)
+	err = deployDeployment(ctx, c, addonControllerTemplate, getSveltosNamespace(), shardKey, patches, logger)
 	if err != nil {
-		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create addon-controller deployment %v", err))
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to deploy addon-controller %v", err))
 		return err
 	}
 
@@ -314,16 +332,16 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 	if err != nil {
 		return err
 	}
-	err = deployDeployment(ctx, c, classifierTemplate, getSveltosNamespace(), shardKey)
+	err = deployDeployment(ctx, c, classifierTemplate, getSveltosNamespace(), shardKey, patches, logger)
 	if err != nil {
-		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create classifier deployment %v", err))
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to deploy classifier %v", err))
 		return err
 	}
 
 	sveltosClusterTemplate := controllerSharding.GetSveltosClusterManagerTemplate()
-	err = deployDeployment(ctx, c, sveltosClusterTemplate, getSveltosNamespace(), shardKey)
+	err = deployDeployment(ctx, c, sveltosClusterTemplate, getSveltosNamespace(), shardKey, patches, logger)
 	if err != nil {
-		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create sveltoscluster-manager deployment %v", err))
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to deploy sveltoscluster-manager %v", err))
 		return err
 	}
 
@@ -335,9 +353,9 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 			return err
 		}
 	}
-	err = deployDeployment(ctx, c, eventManagerTemplate, getSveltosNamespace(), shardKey)
+	err = deployDeployment(ctx, c, eventManagerTemplate, getSveltosNamespace(), shardKey, patches, logger)
 	if err != nil {
-		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create event-manager deployment %v", err))
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to deploy event-manager %v", err))
 		return err
 	}
 
@@ -349,9 +367,9 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 			return err
 		}
 	}
-	err = deployDeployment(ctx, c, healthcheckManagerTemplate, getSveltosNamespace(), shardKey)
+	err = deployDeployment(ctx, c, healthcheckManagerTemplate, getSveltosNamespace(), shardKey, patches, logger)
 	if err != nil {
-		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create healthcheck-manager deployment %v", err))
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to deploy healthcheck-manager %v", err))
 		return err
 	}
 
@@ -428,9 +446,15 @@ func undeployControllers(ctx context.Context, config *rest.Config, shardKey stri
 }
 
 func deployDeployment(ctx context.Context, c client.Client,
-	deploymentTemplate []byte, sveltosNamespace string, shardKey string) error {
+	deploymentTemplate []byte, sveltosNamespace string, shardKey string,
+	patches []libsveltosv1beta1.Patch, logger logr.Logger) error {
 
 	data, err := instantiateTemplate(deploymentTemplate, shardKey)
+	if err != nil {
+		return err
+	}
+
+	data, err = applyShardPatches(data, patches, logger)
 	if err != nil {
 		return err
 	}
@@ -441,16 +465,8 @@ func deployDeployment(ctx context.Context, c client.Client,
 	}
 	deployment.SetNamespace(sveltosNamespace)
 
-	err = c.Create(ctx, deployment)
-	if err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
+	ac := client.ApplyConfigurationFromUnstructured(deployment)
+	return c.Apply(ctx, ac, client.ForceOwnership, client.FieldOwner("shard-controller"))
 }
 
 func undeployDeployment(ctx context.Context, config *rest.Config,
@@ -502,6 +518,106 @@ func instantiateTemplate(deploymentTemplate []byte, shardKey string) ([]byte, er
 	}
 
 	return buffer.Bytes(), nil
+}
+
+// getShardComponentsPatches fetches the shard-components ConfigMap and returns its patches.
+// Returns nil if no ConfigMap name is configured or the ConfigMap does not exist yet.
+func getShardComponentsPatches(ctx context.Context, c client.Client,
+	logger logr.Logger) ([]libsveltosv1beta1.Patch, error) {
+
+	configMapName := getShardComponentsConfigMap()
+	if configMapName == "" {
+		return nil, nil
+	}
+
+	configMap := &corev1.ConfigMap{}
+	err := c.Get(ctx, types.NamespacedName{Namespace: getSveltosNamespace(), Name: configMapName}, configMap)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.V(logs.LogInfo).Info(fmt.Sprintf("shard-components ConfigMap %s not found", configMapName))
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return getPatchesFromConfigMap(configMap, logger)
+}
+
+// getPatchesFromConfigMap parses each value in the ConfigMap's data as a libsveltosv1beta1.Patch.
+// If a patch has no target, it defaults to targeting apps/v1 Deployments.
+func getPatchesFromConfigMap(configMap *corev1.ConfigMap, logger logr.Logger) ([]libsveltosv1beta1.Patch, error) {
+	patches := make([]libsveltosv1beta1.Patch, 0, len(configMap.Data))
+	for k := range configMap.Data {
+		p := &libsveltosv1beta1.Patch{}
+		if err := yaml.Unmarshal([]byte(configMap.Data[k]), p); err != nil {
+			logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to unmarshal patch for key %s: %v", k, err))
+			return nil, err
+		}
+		if p.Patch == "" {
+			return nil, fmt.Errorf("ConfigMap %s: value of key %s is not a valid Patch", configMap.Name, k)
+		}
+		if p.Target == nil {
+			p.Target = &libsveltosv1beta1.PatchSelector{Kind: "Deployment", Group: "apps"}
+		}
+		patches = append(patches, *p)
+	}
+	return patches, nil
+}
+
+// applyShardPatches applies patches to a deployment template byte slice and returns the result.
+// Patches whose target selector does not match the deployment are silently skipped.
+// Returns the original bytes unchanged when patches is empty.
+func applyShardPatches(deploymentData []byte, patches []libsveltosv1beta1.Patch,
+	logger logr.Logger) ([]byte, error) {
+
+	if len(patches) == 0 {
+		return deploymentData, nil
+	}
+
+	u, err := k8s_utils.GetUnstructured(deploymentData)
+	if err != nil {
+		return nil, err
+	}
+
+	p := &patcher.CustomPatchPostRenderer{Patches: patches}
+	patched, err := p.RunUnstructured([]*unstructured.Unstructured{u})
+	if err != nil {
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to apply shard-components patches: %v", err))
+		return nil, err
+	}
+
+	if len(patched) == 0 {
+		return deploymentData, nil
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(buf).Encode(patched[0].Object); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// redeployAllShards re-applies deployments for every active shard, picking up any ConfigMap changes.
+func redeployAllShards(ctx context.Context, c client.Client, agentInMgmtCluster bool,
+	driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig string, logger logr.Logger) error {
+
+	mux.RLock()
+	activeShards := make([]string, 0)
+	for shardKey, clusters := range shardMap {
+		if shardKey != "" && clusters != nil && clusters.Len() > 0 {
+			activeShards = append(activeShards, shardKey)
+		}
+	}
+	mux.RUnlock()
+
+	for _, shardKey := range activeShards {
+		logger.V(logs.LogInfo).Info(fmt.Sprintf("redeploying controllers for shard %s", shardKey))
+		if err := deployControllers(ctx, c, shardKey, agentInMgmtCluster,
+			driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig, logger); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func setOptions(deplTemplate []byte) ([]byte, error) {
