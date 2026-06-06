@@ -76,7 +76,7 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client, false,
-			clusterRef, shardKey, logger)).To(BeNil())
+			"", "", "", clusterRef, shardKey, logger)).To(BeNil())
 
 		currentShard, ok := (*controller.ClusterMap)[*clusterRef]
 		Expect(ok).To(BeTrue())
@@ -93,12 +93,12 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, oldShardKey, logger)).To(BeNil())
+			false, "", "", "", clusterRef, oldShardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, oldShardKey)
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, newShardKey, logger)).To(BeNil())
+			false, "", "", "", clusterRef, newShardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, newShardKey)
 
 		// Verify cluster is not registered anymore as matching oldShardKey
@@ -119,13 +119,13 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, shardKey, logger)).To(BeNil())
+			false, "", "", "", clusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
 		// Second cluster being registered as part of shardKey
 		newClusterRef := getClusterRef()
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, newClusterRef, shardKey, logger)).To(BeNil())
+			false, "", "", "", newClusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(newClusterRef, shardKey)
 	})
 
@@ -136,7 +136,7 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, shardKey, logger)).To(BeNil())
+			false, "", "", "", clusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
 		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, logger)).To(Succeed())
@@ -158,7 +158,7 @@ var _ = Describe("Utils", func() {
 
 		// First cluster being registered as part of shardKey
 		Expect(controller.TrackCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, clusterRef, shardKey, logger)).To(BeNil())
+			false, "", "", "", clusterRef, shardKey, logger)).To(BeNil())
 		verifyClusterIsRegisteredForShard(clusterRef, shardKey)
 
 		Expect(controller.StopTrackingCluster(context.TODO(), testEnv.Config, clusterRef, logger)).To(Succeed())
@@ -216,7 +216,7 @@ var _ = Describe("Utils", func() {
 		Expect(waitForObject(context.TODO(), testEnv.Client, cluster)).To(Succeed())
 
 		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, cluster, req, logger)
+			false, "", "", "", cluster, req, logger)
 		Expect(err).To(BeNil())
 
 		clusterRef := &corev1.ObjectReference{
@@ -241,7 +241,7 @@ var _ = Describe("Utils", func() {
 		}, timeout, pollingInterval).Should(BeTrue())
 
 		err = controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, cluster, req, logger)
+			false, "", "", "", cluster, req, logger)
 		Expect(err).To(BeNil())
 
 		verifyClusterIsRegisteredForShard(clusterRef, "")
@@ -286,7 +286,7 @@ var _ = Describe("Utils", func() {
 
 		// Cluster does not exist
 		err := controller.ProcessCluster(context.TODO(), testEnv.Config, testEnv.Client,
-			false, cluster, req, logger)
+			false, "", "", "", cluster, req, logger)
 		Expect(err).To(BeNil())
 
 		// Verify cluster is not registered anymore as matching oldShardKey
@@ -340,7 +340,7 @@ var _ = Describe("Utils", func() {
 		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjects...).Build()
 
 		Expect(controller.DeployControllers(context.TODO(), c, randomString(),
-			false, logger)).To(Succeed())
+			false, "", "", "", logger)).To(Succeed())
 
 		deploymentList := &appsv1.DeploymentList{}
 		listOptions := []client.ListOption{
@@ -364,7 +364,7 @@ var _ = Describe("Utils", func() {
 		currentDeploments := len(deploymentList.Items)
 
 		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, randomString(),
-			true, logger)).To(Succeed())
+			true, "", "", "", logger)).To(Succeed())
 
 		const expectedNewDeployment = 5 // addon-controller, event-manager, healthcheck-manager,
 		// classifier, sveltoscluster-manager
@@ -388,7 +388,7 @@ var _ = Describe("Utils", func() {
 
 		shardKey := randomString()
 		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, shardKey,
-			false, logger)).To(Succeed())
+			false, "", "", "", logger)).To(Succeed())
 
 		const expectedDeployment = 5 // addon-controller, event-manager, healthcheck-manager,
 		// classifier, sveltoscluster-manager
@@ -409,6 +409,204 @@ var _ = Describe("Utils", func() {
 			}
 			return len(deploymentList.Items) == currentDeployments
 		}, timeout, pollingInterval).Should(BeTrue())
+	})
+
+	It("deployControllers accepts driftDetectionConfig and sveltosAgentConfig parameters", func() {
+		driftCfg := "drift-config-value"
+		agentCfg := "agent-config-value"
+		applierCfg := "applier-config-value"
+		shardKey := randomString()
+
+		// Verify deployControllers accepts and processes the config parameters without error
+		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, shardKey,
+			false, driftCfg, agentCfg, applierCfg, logger)).To(Succeed())
+
+		// Verify addon-controller deployment was created with correct shard name
+		addonDeployment := &appsv1.Deployment{}
+		err := testEnv.Get(context.TODO(),
+			types.NamespacedName{
+				Namespace: sveltosNamespace,
+				Name:      "addon-controller-" + shardKey,
+			},
+			addonDeployment)
+		Expect(err).To(BeNil())
+		Expect(addonDeployment).ToNot(BeNil())
+		Expect(addonDeployment.Spec.Template.Spec.Containers).ToNot(BeEmpty())
+
+		// Verify classifier deployment was created with correct shard name
+		classifierDeployment := &appsv1.Deployment{}
+		err = testEnv.Get(context.TODO(),
+			types.NamespacedName{
+				Namespace: sveltosNamespace,
+				Name:      "classifier-manager-" + shardKey,
+			},
+			classifierDeployment)
+		Expect(err).To(BeNil())
+		Expect(classifierDeployment).ToNot(BeNil())
+		Expect(classifierDeployment.Spec.Template.Spec.Containers).ToNot(BeEmpty())
+
+		// Verify addon deployment has correct config args
+		addonContainers := addonDeployment.Spec.Template.Spec.Containers
+		addonArgs := make(map[string]bool)
+		for _, container := range addonContainers {
+			for _, arg := range container.Args {
+				addonArgs[arg] = true
+			}
+		}
+		Expect(addonArgs).To(HaveKey("--drift-detection-config="+driftCfg),
+			"addon-controller must have --drift-detection-config arg with correct value")
+
+		// Verify classifier deployment has correct config args
+		classifierContainers := classifierDeployment.Spec.Template.Spec.Containers
+		classifierArgs := make(map[string]bool)
+		for _, container := range classifierContainers {
+			for _, arg := range container.Args {
+				classifierArgs[arg] = true
+			}
+		}
+		Expect(classifierArgs).To(HaveKey("--sveltos-agent-config="+agentCfg),
+			"classifier must have --sveltos-agent-config arg with correct value")
+		Expect(classifierArgs).To(HaveKey("--sveltos-applier-config="+applierCfg),
+			"classifier must have --sveltos-applier-config arg with correct value")
+	})
+
+	It("deployControllers passes correct shard-key to controllers", func() {
+		listOptions := []client.ListOption{
+			client.InNamespace(sveltosNamespace),
+		}
+
+		deploymentList := &appsv1.DeploymentList{}
+		Expect(testEnv.List(context.TODO(), deploymentList, listOptions...)).To(Succeed())
+		currentDeployments := len(deploymentList.Items)
+
+		shardKey := randomString()
+
+		// Deploy controllers with specific shard key
+		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, shardKey,
+			false, "", "", "", logger)).To(Succeed())
+
+		const expectedDeployment = 5 // addon-controller, event-manager, healthcheck-manager,
+		// classifier, sveltoscluster-manager
+		Eventually(func() bool {
+			err := testEnv.List(context.TODO(), deploymentList, listOptions...)
+			if err != nil {
+				return false
+			}
+			return len(deploymentList.Items) == expectedDeployment+currentDeployments
+		}, timeout, pollingInterval).Should(BeTrue())
+
+		// Verify addon-controller deployment has correct shard key
+		addonDeployment := &appsv1.Deployment{}
+		err := testEnv.Get(context.TODO(),
+			types.NamespacedName{
+				Namespace: sveltosNamespace,
+				Name:      "addon-controller-" + shardKey,
+			},
+			addonDeployment)
+		Expect(err).To(BeNil())
+		Expect(addonDeployment).ToNot(BeNil())
+
+		addonContainers := addonDeployment.Spec.Template.Spec.Containers
+		addonArgs := make(map[string]bool)
+		for _, container := range addonContainers {
+			for _, arg := range container.Args {
+				addonArgs[arg] = true
+			}
+		}
+		Expect(addonArgs).To(HaveKey("--shard-key="+shardKey),
+			"addon-controller should have --shard-key arg with correct shard")
+
+		// Verify classifier deployment has correct shard key
+		classifierDeployment := &appsv1.Deployment{}
+		err = testEnv.Get(context.TODO(),
+			types.NamespacedName{
+				Namespace: sveltosNamespace,
+				Name:      "classifier-manager-" + shardKey,
+			},
+			classifierDeployment)
+		Expect(err).To(BeNil())
+		Expect(classifierDeployment).ToNot(BeNil())
+
+		classifierContainers := classifierDeployment.Spec.Template.Spec.Containers
+		classifierArgs := make(map[string]bool)
+		for _, container := range classifierContainers {
+			for _, arg := range container.Args {
+				classifierArgs[arg] = true
+			}
+		}
+		Expect(classifierArgs).To(HaveKey("--shard-key="+shardKey),
+			"classifier should have --shard-key arg with correct shard")
+	})
+
+	It("deployControllers omits optional args when config values are not provided", func() {
+		listOptions := []client.ListOption{
+			client.InNamespace(sveltosNamespace),
+		}
+
+		deploymentList := &appsv1.DeploymentList{}
+		Expect(testEnv.List(context.TODO(), deploymentList, listOptions...)).To(Succeed())
+		currentDeployments := len(deploymentList.Items)
+
+		shardKey := randomString()
+
+		// Deploy with empty config values (args should be omitted)
+		Expect(controller.DeployControllers(context.TODO(), testEnv.Client, shardKey,
+			false, "", "", "", logger)).To(Succeed())
+
+		const expectedDeployment = 5
+		Eventually(func() bool {
+			err := testEnv.List(context.TODO(), deploymentList, listOptions...)
+			if err != nil {
+				return false
+			}
+			return len(deploymentList.Items) == expectedDeployment+currentDeployments
+		}, timeout, pollingInterval).Should(BeTrue())
+
+		// Verify addon-controller deployment does not have --drift-detection-config arg
+		addonDeployment := &appsv1.Deployment{}
+		err := testEnv.Get(context.TODO(),
+			types.NamespacedName{
+				Namespace: sveltosNamespace,
+				Name:      "addon-controller-" + shardKey,
+			},
+			addonDeployment)
+		Expect(err).To(BeNil())
+
+		addonArgs := make(map[string]bool)
+		for _, container := range addonDeployment.Spec.Template.Spec.Containers {
+			for _, arg := range container.Args {
+				addonArgs[arg] = true
+			}
+		}
+		// Check that drift-detection-config arg is NOT present
+		for arg := range addonArgs {
+			Expect(arg).ToNot(ContainSubstring("--drift-detection-config"),
+				"addon-controller should not have --drift-detection-config arg when not provided")
+		}
+
+		// Verify classifier deployment does not have sveltos config args
+		classifierDeployment := &appsv1.Deployment{}
+		err = testEnv.Get(context.TODO(),
+			types.NamespacedName{
+				Namespace: sveltosNamespace,
+				Name:      "classifier-manager-" + shardKey,
+			},
+			classifierDeployment)
+		Expect(err).To(BeNil())
+
+		classifierArgs := make(map[string]bool)
+		for _, container := range classifierDeployment.Spec.Template.Spec.Containers {
+			for _, arg := range container.Args {
+				classifierArgs[arg] = true
+			}
+		}
+		// Check that sveltos config args are NOT present
+		for arg := range classifierArgs {
+			Expect(arg).ToNot(ContainSubstring("--sveltos-agent-config"),
+				"classifier should not have --sveltos-agent-config arg when not provided")
+			Expect(arg).ToNot(ContainSubstring("--sveltos-applier-config"),
+				"classifier should not have --sveltos-applier-config arg when not provided")
+		}
 	})
 })
 

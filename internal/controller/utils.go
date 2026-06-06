@@ -99,7 +99,8 @@ func InitScheme() (*runtime.Scheme, error) {
 }
 
 func processCluster(ctx context.Context, config *rest.Config, c client.Client,
-	agentInMgmtCluster bool, cluster client.Object, req ctrl.Request, logger logr.Logger) error {
+	agentInMgmtCluster bool, driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig string,
+	cluster client.Object, req ctrl.Request, logger logr.Logger) error {
 
 	if err := c.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -136,7 +137,7 @@ func processCluster(ctx context.Context, config *rest.Config, c client.Client,
 		currentShard = annotations[libsveltosv1beta1.ShardAnnotation]
 	}
 
-	return trackCluster(ctx, config, c, agentInMgmtCluster, clusterRef, currentShard, logger)
+	return trackCluster(ctx, config, c, agentInMgmtCluster, driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig, clusterRef, currentShard, logger)
 }
 
 // trackCluster starts tracking a cluster:
@@ -150,7 +151,7 @@ func processCluster(ctx context.Context, config *rest.Config, c client.Client,
 // cluster moves to currentShardKey, no more clusters are part of old shard,
 // removes projectsveltos deployments for old shard.
 func trackCluster(ctx context.Context, config *rest.Config, c client.Client, agentInMgmtCluster bool,
-	cluster *corev1.ObjectReference, currentShardKey string, logger logr.Logger) error {
+	driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig string, cluster *corev1.ObjectReference, currentShardKey string, logger logr.Logger) error {
 
 	mux.Lock()
 	defer mux.Unlock()
@@ -188,7 +189,7 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client, age
 	// currentShardKey
 	if shardMap[currentShardKey] == nil || shardMap[currentShardKey].Len() == 0 {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("first cluster matching shard %q", currentShardKey))
-		if err := deployControllers(ctx, c, currentShardKey, agentInMgmtCluster, logger); err != nil {
+		if err := deployControllers(ctx, c, currentShardKey, agentInMgmtCluster, driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig, logger); err != nil {
 			return err
 		}
 	}
@@ -272,7 +273,7 @@ func addTypeInformationToObject(scheme *runtime.Scheme, obj client.Object) {
 }
 
 func deployControllers(ctx context.Context, c client.Client, shardKey string, //nolint: funlen // deploying sveltos controllers
-	agentInMgmtCluster bool, logger logr.Logger) error {
+	agentInMgmtCluster bool, driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig string, logger logr.Logger) error {
 
 	if shardKey == "" {
 		// Clusters with no shard annotation are managed by the default projectsveltos deployments
@@ -291,6 +292,10 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 			return err
 		}
 	}
+	addonControllerTemplate, err = addDriftDetectionConfig(addonControllerTemplate, driftDetectionConfig)
+	if err != nil {
+		return err
+	}
 	err = deployDeployment(ctx, c, addonControllerTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to create addon-controller deployment %v", err))
@@ -304,6 +309,10 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 		if err != nil {
 			return err
 		}
+	}
+	classifierTemplate, err = addClassifierConfigs(classifierTemplate, sveltosAgentConfig, sveltosApplierConfig)
+	if err != nil {
+		return err
 	}
 	err = deployDeployment(ctx, c, classifierTemplate, getSveltosNamespace(), shardKey)
 	if err != nil {
@@ -347,6 +356,28 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 	}
 
 	return nil
+}
+
+func addDriftDetectionConfig(tmpl []byte, driftDetectionConfig string) ([]byte, error) {
+	if driftDetectionConfig == "" {
+		return tmpl, nil
+	}
+	return appendArgsToContainer(tmpl, "controller",
+		map[string]string{"--drift-detection-config": driftDetectionConfig})
+}
+
+func addClassifierConfigs(tmpl []byte, sveltosAgentConfig, sveltosApplierConfig string) ([]byte, error) {
+	if sveltosAgentConfig == "" && sveltosApplierConfig == "" {
+		return tmpl, nil
+	}
+	classifierArgsToAdd := make(map[string]string)
+	if sveltosAgentConfig != "" {
+		classifierArgsToAdd["--sveltos-agent-config"] = sveltosAgentConfig
+	}
+	if sveltosApplierConfig != "" {
+		classifierArgsToAdd["--sveltos-applier-config"] = sveltosApplierConfig
+	}
+	return appendArgsToContainer(tmpl, "manager", classifierArgsToAdd)
 }
 
 func undeployControllers(ctx context.Context, config *rest.Config, shardKey string, logger logr.Logger) error {
@@ -397,7 +428,7 @@ func undeployControllers(ctx context.Context, config *rest.Config, shardKey stri
 }
 
 func deployDeployment(ctx context.Context, c client.Client,
-	deploymentTemplate []byte, sveltosNamespace, shardKey string) error {
+	deploymentTemplate []byte, sveltosNamespace string, shardKey string) error {
 
 	data, err := instantiateTemplate(deploymentTemplate, shardKey)
 	if err != nil {
@@ -423,7 +454,7 @@ func deployDeployment(ctx context.Context, c client.Client,
 }
 
 func undeployDeployment(ctx context.Context, config *rest.Config,
-	deploymentTemplate []byte, sveltosNamespace, shardKey string) error {
+	deploymentTemplate []byte, sveltosNamespace string, shardKey string) error {
 
 	data, err := instantiateTemplate(deploymentTemplate, shardKey)
 	if err != nil {
@@ -528,5 +559,41 @@ func setOptions(deplTemplate []byte) ([]byte, error) {
 	}
 
 	// Get the encoded JSON data from the buffer.
+	return buffer.Bytes(), nil
+}
+
+func appendArgsToContainer(deplTemplate []byte, containerName string, argsToAdd map[string]string) ([]byte, error) {
+	u, err := k8s_utils.GetUnstructured(deplTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	depl := appsv1.Deployment{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &depl)
+	if err != nil {
+		return nil, err
+	}
+
+	for flag, value := range argsToAdd {
+		if value == "" {
+			continue
+		}
+		arg := fmt.Sprintf("%s=%s", flag, value)
+
+		for i := range depl.Spec.Template.Spec.Containers {
+			if depl.Spec.Template.Spec.Containers[i].Name == containerName {
+				depl.Spec.Template.Spec.Containers[i].Args = append(
+					depl.Spec.Template.Spec.Containers[i].Args, arg)
+			}
+		}
+	}
+
+	buffer := bytes.NewBuffer([]byte{})
+	encoder := json.NewEncoder(buffer)
+	err = encoder.Encode(depl)
+	if err != nil {
+		return nil, err
+	}
+
 	return buffer.Bytes(), nil
 }

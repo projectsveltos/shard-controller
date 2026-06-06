@@ -52,17 +52,20 @@ import (
 )
 
 var (
-	setupLog            = ctrl.Log.WithName("setup")
-	diagnosticsAddress  string
-	insecureDiagnostics bool
-	agentInMgmtCluster  bool
-	reportMode          controller.ReportMode
-	tmpReportMode       int
-	restConfigQPS       float32
-	restConfigBurst     int
-	webhookPort         int
-	syncPeriod          time.Duration
-	healthAddr          string
+	setupLog             = ctrl.Log.WithName("setup")
+	diagnosticsAddress   string
+	insecureDiagnostics  bool
+	agentInMgmtCluster   bool
+	driftDetectionConfig string
+	sveltosAgentConfig   string
+	sveltosApplierConfig string
+	reportMode           controller.ReportMode
+	tmpReportMode        int
+	restConfigQPS        float32
+	restConfigBurst      int
+	webhookPort          int
+	syncPeriod           time.Duration
+	healthAddr           string
 )
 
 const (
@@ -126,11 +129,14 @@ func main() {
 		ctrl.GetConfigOrDie())
 
 	if err = (&controller.SveltosClusterReconciler{
-		Config:             mgr.GetConfig(),
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		AgentInMgmtCluster: agentInMgmtCluster,
-		ReportMode:         reportMode,
+		Config:               mgr.GetConfig(),
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		AgentInMgmtCluster:   agentInMgmtCluster,
+		DriftDetectionConfig: driftDetectionConfig,
+		SveltosAgentConfig:   sveltosAgentConfig,
+		SveltosApplierConfig: sveltosApplierConfig,
+		ReportMode:           reportMode,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SveltosCluster")
 		os.Exit(1)
@@ -162,6 +168,21 @@ func initFlags(fs *pflag.FlagSet) {
 		"agent-in-mgmt-cluster",
 		false,
 		"flag which is passed to sveltos deployments created for a cluster shard")
+
+	fs.StringVar(&driftDetectionConfig,
+		"drift-detection-config",
+		"",
+		"optional config passed to addon-controller deployments created for a cluster shard")
+
+	fs.StringVar(&sveltosAgentConfig,
+		"sveltos-agent-config",
+		"",
+		"optional config passed to classifier deployments created for a cluster shard")
+
+	fs.StringVar(&sveltosApplierConfig,
+		"sveltos-applier-config",
+		"",
+		"optional config passed to classifier deployments created for a cluster shard")
 
 	fs.IntVar(&tmpReportMode,
 		"report-mode",
@@ -220,11 +241,14 @@ func capiWatchers(ctx context.Context, mgr ctrl.Manager, logger logr.Logger) {
 			} else {
 				setupLog.V(logs.LogInfo).Info("CAPI present.")
 				if err = (&controller.ClusterReconciler{
-					Config:             mgr.GetConfig(),
-					Client:             mgr.GetClient(),
-					Scheme:             mgr.GetScheme(),
-					AgentInMgmtCluster: agentInMgmtCluster,
-					ReportMode:         reportMode,
+					Config:               mgr.GetConfig(),
+					Client:               mgr.GetClient(),
+					Scheme:               mgr.GetScheme(),
+					AgentInMgmtCluster:   agentInMgmtCluster,
+					DriftDetectionConfig: driftDetectionConfig,
+					SveltosAgentConfig:   sveltosAgentConfig,
+					SveltosApplierConfig: sveltosApplierConfig,
+					ReportMode:           reportMode,
 				}).SetupWithManager(mgr); err != nil {
 					setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 					os.Exit(1)
