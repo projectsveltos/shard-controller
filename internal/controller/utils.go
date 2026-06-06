@@ -177,8 +177,11 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client, age
 	}
 
 	if alreadyTracked {
-		if shardMap[oldShard].Has(cluster) &&
-			shardMap[oldShard].Len() == 1 {
+		// shardMap[oldShard] may be nil when a previous reconcile failed after
+		// updating clusterMap but before updating shardMap. Guard every access.
+		oldClusterPerShard := shardMap[oldShard]
+		if oldClusterPerShard != nil && oldClusterPerShard.Has(cluster) &&
+			oldClusterPerShard.Len() == 1 {
 			// By removing cluster, no more clusters will match oldShard.
 			// Remove controllers first
 			logger.V(logs.LogInfo).Info(fmt.Sprintf("no more clusters for shard %s", oldShard))
@@ -187,17 +190,13 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client, age
 			}
 		}
 
-		// Updates shard map (key: shard; value: list of cluster matching the shard)
-		// for the old shard by adding cluster as a match
-		clusterPerShard := shardMap[oldShard]
-		clusterPerShard.Erase(cluster)
-		shardMap[oldShard] = clusterPerShard
-		logger.V(logs.LogInfo).Info(fmt.Sprintf("removed cluster from shard %q: %d cluster(s) remaining",
-			oldShard, clusterPerShard.Len()))
+		if oldClusterPerShard != nil {
+			oldClusterPerShard.Erase(cluster)
+			shardMap[oldShard] = oldClusterPerShard
+			logger.V(logs.LogInfo).Info(fmt.Sprintf("removed cluster from shard %q: %d cluster(s) remaining",
+				oldShard, oldClusterPerShard.Len()))
+		}
 	}
-
-	// Update Cluster shard (key: cluster; value: cluster current shard)
-	clusterMap[*cluster] = currentShardKey
 
 	// If cluster is first cluster matching this shard, deploy projectsveltos deployment for
 	// currentShardKey
@@ -208,14 +207,15 @@ func trackCluster(ctx context.Context, config *rest.Config, c client.Client, age
 		}
 	}
 
-	// Updates shard map (key: shard; value: list of cluster matching the shard)
-	// for the current shard by adding cluster as a match
+	// Update both maps only after deployControllers succeeds, keeping clusterMap
+	// and shardMap consistent even when deployControllers returns an error.
 	clusterPerShard := shardMap[currentShardKey]
 	if clusterPerShard == nil {
 		clusterPerShard = &libsveltosset.Set{}
 	}
 	clusterPerShard.Insert(cluster)
 	shardMap[currentShardKey] = clusterPerShard
+	clusterMap[*cluster] = currentShardKey
 	logger.V(logs.LogInfo).Info(fmt.Sprintf("added cluster to shard %q: %d cluster(s) total",
 		currentShardKey, clusterPerShard.Len()))
 
