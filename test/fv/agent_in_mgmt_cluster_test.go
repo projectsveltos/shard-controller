@@ -27,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	libsveltosv1beta1 "github.com/projectsveltos/libsveltos/api/v1beta1"
@@ -38,45 +39,51 @@ const (
 	shardControllerName   = "shard-controller"
 	agentInMgmtClusterArg = "--agent-in-mgmt-cluster"
 	kubeRbacProxy         = "kube-rbac-proxy"
+	managerContainerName  = "manager"
 )
 
 var _ = Describe("Agent in management cluster mode", Serial, func() {
 	AfterEach(func() {
-		shardController := &appsv1.Deployment{}
-
-		Expect(k8sClient.Get(context.TODO(),
-			types.NamespacedName{Namespace: sveltosNamespace, Name: shardControllerName},
-			shardController)).To(Succeed())
-
-		for i := range shardController.Spec.Template.Spec.Containers {
-			container := &shardController.Spec.Template.Spec.Containers[i]
-			if container.Name != kubeRbacProxy {
-				container.Args = removeAgentInMgmtClusterArg(container)
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			shardController := &appsv1.Deployment{}
+			if err := k8sClient.Get(context.TODO(),
+				types.NamespacedName{Namespace: sveltosNamespace, Name: shardControllerName},
+				shardController); err != nil {
+				return err
 			}
-		}
-		Expect(k8sClient.Update(context.TODO(), shardController)).To(Succeed())
+			for i := range shardController.Spec.Template.Spec.Containers {
+				container := &shardController.Spec.Template.Spec.Containers[i]
+				if container.Name != kubeRbacProxy {
+					container.Args = removeAgentInMgmtClusterArg(container)
+				}
+			}
+			return k8sClient.Update(context.TODO(), shardController)
+		})
+		Expect(err).To(BeNil())
 	})
 
 	It("Start Sveltos deployment with agent-in-mgmt-cluster option", Label("FV"), func() {
-		shardController := &appsv1.Deployment{}
-
-		Expect(k8sClient.Get(context.TODO(),
-			types.NamespacedName{Namespace: sveltosNamespace, Name: shardControllerName},
-			shardController)).To(Succeed())
-
 		updated := false
-		for i := range shardController.Spec.Template.Spec.Containers {
-			container := &shardController.Spec.Template.Spec.Containers[i]
-			if container.Name == "manager" {
-				container.Args = removeAgentInMgmtClusterArg(container)
-				container.Args = append(container.Args, agentInMgmtClusterArg)
-				updated = true
-				break
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			shardController := &appsv1.Deployment{}
+			if err := k8sClient.Get(context.TODO(),
+				types.NamespacedName{Namespace: sveltosNamespace, Name: shardControllerName},
+				shardController); err != nil {
+				return err
 			}
-		}
-
+			for i := range shardController.Spec.Template.Spec.Containers {
+				container := &shardController.Spec.Template.Spec.Containers[i]
+				if container.Name == managerContainerName {
+					container.Args = removeAgentInMgmtClusterArg(container)
+					container.Args = append(container.Args, agentInMgmtClusterArg)
+					updated = true
+					break
+				}
+			}
+			return k8sClient.Update(context.TODO(), shardController)
+		})
+		Expect(err).To(BeNil())
 		Expect(updated).To(BeTrue())
-		Expect(k8sClient.Update(context.TODO(), shardController)).To(Succeed())
 
 		shard := randomString()
 		Byf("Update Cluster shard annotation to %s", shard)
@@ -110,7 +117,7 @@ var _ = Describe("Agent in management cluster mode", Serial, func() {
 			addonDeployment.GetNamespace(), addonDeployment.GetName()))
 		foundContainer := false
 		for i := range addonDeployment.Spec.Template.Spec.Containers {
-			container := &shardController.Spec.Template.Spec.Containers[i]
+			container := &addonDeployment.Spec.Template.Spec.Containers[i]
 			if container.Name != kubeRbacProxy {
 				foundContainer = true
 				verifyAgentInMgmtClusterArg(container)
