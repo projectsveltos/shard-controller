@@ -39,6 +39,7 @@ import (
 
 const (
 	shardComponentsConfigFlag = "--shard-components-config"
+	addLabel                  = "add-label"
 )
 
 var _ = Describe("Shard components patch", Serial, func() {
@@ -101,7 +102,7 @@ var _ = Describe("Shard components patch", Serial, func() {
 				Namespace: sveltosNamespace,
 			},
 			Data: map[string]string{
-				"add-label": fmt.Sprintf("patch: '%s'", patchJSON),
+				addLabel: fmt.Sprintf("patch: '%s'", patchJSON),
 			},
 		}
 		Byf("Creating ConfigMap %s/%s with label-injection patch", sveltosNamespace, configMapName)
@@ -167,7 +168,7 @@ var _ = Describe("Shard components patch", Serial, func() {
 				Namespace: sveltosNamespace,
 			},
 			Data: map[string]string{
-				"add-label": fmt.Sprintf("patch: '%s'", patchJSON),
+				addLabel: fmt.Sprintf("patch: '%s'", patchJSON),
 			},
 		}
 		Byf("Creating ConfigMap %s/%s with initial patch value %s", sveltosNamespace, configMapName, initialValue)
@@ -215,7 +216,7 @@ var _ = Describe("Shard components patch", Serial, func() {
 				types.NamespacedName{Namespace: sveltosNamespace, Name: configMapName}, currentCM); err != nil {
 				return err
 			}
-			currentCM.Data["add-label"] = fmt.Sprintf("patch: '%s'", updatedPatchJSON)
+			currentCM.Data[addLabel] = fmt.Sprintf("patch: '%s'", updatedPatchJSON)
 			return k8sClient.Update(context.TODO(), currentCM)
 		})
 		Expect(err).To(BeNil())

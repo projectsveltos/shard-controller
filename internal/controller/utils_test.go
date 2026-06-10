@@ -684,6 +684,10 @@ var _ = Describe("Utils", func() {
 	})
 
 	Context("applyShardPatches", func() {
+		const (
+			patchValue = `[{"op":"add","path":"/metadata/labels/injected","value":"yes"}]`
+		)
+
 		It("returns original bytes unchanged when patches is empty", func() {
 			original := []byte(fmt.Sprintf(nginxDeploymentTemplate, sveltosNamespace))
 			result, err := controller.ApplyShardPatches(original, nil, logger)
@@ -695,7 +699,7 @@ var _ = Describe("Utils", func() {
 			deployYAML := []byte(fmt.Sprintf(nginxDeploymentTemplate, sveltosNamespace))
 			patches := []libsveltosv1beta1.Patch{
 				{
-					Patch:  `[{"op":"add","path":"/metadata/labels/injected","value":"yes"}]`,
+					Patch:  patchValue,
 					Target: &libsveltosv1beta1.PatchSelector{Group: "apps", Kind: "Deployment"},
 				},
 			}
@@ -710,7 +714,7 @@ var _ = Describe("Utils", func() {
 			deployYAML := []byte(fmt.Sprintf(nginxDeploymentTemplate, sveltosNamespace))
 			patches := []libsveltosv1beta1.Patch{
 				{
-					Patch:  `[{"op":"add","path":"/metadata/labels/injected","value":"yes"}]`,
+					Patch:  patchValue,
 					Target: &libsveltosv1beta1.PatchSelector{Group: "", Kind: "ConfigMap"},
 				},
 			}
