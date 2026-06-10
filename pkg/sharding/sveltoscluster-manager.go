@@ -42,7 +42,20 @@ spec:
         - --v=5
         command:
         - /manager
-        image: docker.io/projectsveltos/sveltoscluster-manager:v1.10.0
+        env:
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: docker.io/projectsveltos/sveltoscluster-manager@sha256:7e4cb1fc21128cc251a06e02a2b6a41251881ffb16dbc1728b66bfba21ff09f2
         livenessProbe:
           failureThreshold: 3
           httpGet:
