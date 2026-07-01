@@ -205,5 +205,7 @@ spec:
             - ALL
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: shard-controller
       terminationGracePeriodSeconds: 10
