@@ -41,7 +41,7 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.11.0
+        - --version=main
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
@@ -58,7 +58,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: docker.io/projectsveltos/healthcheck-manager@sha256:bf432abe86ceb781a89c1894abaabf99506e4fb477599840f456d987a4c22f34
+        image: docker.io/projectsveltos/healthcheck-manager@sha256:78c2e4c8ee438fcbdbbfa833268c65db91484d757ec167470f2da2d067839f5f
         livenessProbe:
           failureThreshold: 3
           httpGet:

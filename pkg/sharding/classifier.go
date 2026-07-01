@@ -28,6 +28,8 @@ spec:
   selector:
     matchLabels:
       control-plane: classifier
+  strategy:
+    type: Recreate
   template:
     metadata:
       annotations:
@@ -42,7 +44,7 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.11.0
+        - --version=main
         - --registry=
         - --agent-in-mgmt-cluster=false
         command:
@@ -60,7 +62,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: docker.io/projectsveltos/classifier@sha256:563ac03890e60902ef251d0fa5aefb82918cadf9b1fb186e29109efbdfe0e976
+        image: docker.io/projectsveltos/classifier@sha256:fff85efc68cbb3df969ce2748db9c1b1db8e3ba42d4478cd2c6d056b8ee11c79
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -108,7 +110,7 @@ spec:
               fieldPath: metadata.namespace
         - name: IS_INITIALIZATION
           value: "true"
-        image: docker.io/projectsveltos/classifier@sha256:563ac03890e60902ef251d0fa5aefb82918cadf9b1fb186e29109efbdfe0e976
+        image: docker.io/projectsveltos/classifier@sha256:fff85efc68cbb3df969ce2748db9c1b1db8e3ba42d4478cd2c6d056b8ee11c79
         imagePullPolicy: IfNotPresent
         name: migrate
         resources:
@@ -125,6 +127,8 @@ spec:
             - ALL
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: classifier-manager
       terminationGracePeriodSeconds: 10
 `)
