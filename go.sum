@@ -146,8 +146,8 @@ github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/projectsveltos/libsveltos v1.11.2-0.20260630062346-87fc6de07e4a h1:KuqOQNqIJf/rUJXISalUj3KPELq3b8taSASAw0hpqnc=
-github.com/projectsveltos/libsveltos v1.11.2-0.20260630062346-87fc6de07e4a/go.mod h1:qxA5aI6uodU2izOjoaFcC5yqizE/7HBXSM8674BXMbg=
+github.com/projectsveltos/libsveltos v1.12.0 h1:xQfo/AEh3vVRbfWVazpsgBoRgBG5vzm/sJmXp5YrUEg=
+github.com/projectsveltos/libsveltos v1.12.0/go.mod h1:4/vcbYFCFE8uEGIHmltriAoHxdB8jgS2zI+9gruOfJ4=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=
 github.com/prometheus/client_golang v1.23.2/go.mod h1:Tb1a6LWHB3/SPIzCoaDXI4I8UHKeFTEQ1YCr+0Gyqmg=
 github.com/prometheus/client_model v0.6.2 h1:oBsgwpGs7iVziMvrGhE53c/GrLUsZdHnqNwqPLxwZyk=
