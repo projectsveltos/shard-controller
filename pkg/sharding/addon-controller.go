@@ -44,7 +44,7 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.12.0
+        - --version=main
         - --agent-in-mgmt-cluster=false
         command:
         - /manager
@@ -61,7 +61,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: docker.io/projectsveltos/addon-controller@sha256:98312b5bc21f1cd6dd3d9b3d6d2d530981f8f3369477ae5455869ef11fceaf18
+        image: docker.io/projectsveltos/addon-controller@sha256:ebf9d3e12f9e02b2287e9caf0cc46d5a8077e097e540aab0e09e19b0a62bafea
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -119,7 +119,7 @@ spec:
               fieldPath: metadata.namespace
         - name: IS_INITIALIZATION
           value: "true"
-        image: docker.io/projectsveltos/addon-controller@sha256:98312b5bc21f1cd6dd3d9b3d6d2d530981f8f3369477ae5455869ef11fceaf18
+        image: docker.io/projectsveltos/addon-controller@sha256:ebf9d3e12f9e02b2287e9caf0cc46d5a8077e097e540aab0e09e19b0a62bafea
         name: initialization
         securityContext:
           allowPrivilegeEscalation: false
