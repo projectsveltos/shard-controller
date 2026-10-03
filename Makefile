@@ -2,7 +2,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # KUBEBUILDER_ENVTEST_KUBERNETES_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-KUBEBUILDER_ENVTEST_KUBERNETES_VERSION = 1.36.0
+KUBEBUILDER_ENVTEST_KUBERNETES_VERSION = 1.37.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -36,7 +36,7 @@ ARCH ?= amd64
 OS ?= $(shell uname -s | tr A-Z a-z)
 K8S_LATEST_VER ?= $(shell curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
 export CONTROLLER_IMG ?= $(REGISTRY)/$(IMAGE_NAME)
-TAG ?= v1.15.0
+TAG ?= v1.16.0
 
 ## Tool Binaries
 CONTROLLER_GEN := $(TOOLS_BIN_DIR)/controller-gen
@@ -59,7 +59,7 @@ KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
 $(KUSTOMIZE): # Build kustomize from tools folder.
 	CGO_ENABLED=0 GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(KUSTOMIZE_PKG) $(KUSTOMIZE_BIN) $(KUSTOMIZE_VER)
 
-SETUP_ENVTEST_VER := release-0.22
+SETUP_ENVTEST_VER := release-0.25
 SETUP_ENVTEST_BIN := setup-envtest
 SETUP_ENVTEST := $(abspath $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)-$(SETUP_ENVTEST_VER))
 SETUP_ENVTEST_PKG := sigs.k8s.io/controller-runtime/tools/setup-envtest
@@ -150,16 +150,12 @@ lint: $(GOLANGCI_LINT) generate ## Lint codebase
 
 ##@ Testing
 
-ifeq ($(shell go env GOOS),darwin) # Use the darwin/amd64 binary until an arm64 version is available
-KUBEBUILDER_ASSETS ?= $(shell $(SETUP_ENVTEST) use --use-env -p path --arch amd64 $(KUBEBUILDER_ENVTEST_KUBERNETES_VERSION))
-else
 KUBEBUILDER_ASSETS ?= $(shell $(SETUP_ENVTEST) use --use-env -p path $(KUBEBUILDER_ENVTEST_KUBERNETES_VERSION))
-endif
 
 # K8S_VERSION for the Kind cluster can be set as environment variable. If not defined,
 # this default value is used
 ifndef K8S_VERSION
-K8S_VERSION := v1.36.1
+K8S_VERSION := v1.37.0
 endif
 
 KIND_CONFIG ?= kind-cluster.yaml
@@ -189,6 +185,13 @@ fv-namespace: $(GINKGO) $(KUBECTL) $(KUSTOMIZE) $(ENVSUBST) ## Deploy Sveltos in
 	    sed -E 's/^([[:space:]]+)(name|namespace): projectsveltos$$/\1\2: '"$$SVELTOS_NS"'/' | \
 	    $(KUBECTL) apply -f-; \
 	$(KUBECTL) wait --for=condition=Available deployment/addon-controller -n "$$SVELTOS_NS" --timeout=$(TIMEOUT); \
+	for component in classifier:classifier-manager event-manager:event-manager healthcheck-manager:hc-manager sveltoscluster-manager:sc-manager; do \
+	    repo=$${component%%:*}; depl=$${component##*:}; \
+	    curl -s https://raw.githubusercontent.com/projectsveltos/$$repo/$(TAG)/manifest/manifest.yaml | \
+	        sed -E 's/^([[:space:]]+)(name|namespace): projectsveltos$$/\1\2: '"$$SVELTOS_NS"'/' | \
+	        $(KUBECTL) apply -f-; \
+	    $(KUBECTL) wait --for=condition=Available deployment/$$depl -n "$$SVELTOS_NS" --timeout=$(TIMEOUT); \
+	done; \
 	$(KUSTOMIZE) build config/default | $(ENVSUBST) | \
 	    sed -E 's/^([[:space:]]+)(name|namespace): projectsveltos$$/\1\2: '"$$SVELTOS_NS"'/' | \
 	    $(KUBECTL) apply -f-; \
@@ -228,7 +231,7 @@ create-cluster-infra: $(KIND) $(CLUSTERCTL) $(KUBECTL) $(ENVSUBST) ## Create clu
 	$(KIND) get kubeconfig --name $(WORKLOAD_CLUSTER_NAME) > test/fv/workload_kubeconfig
 
 	@echo "install calico on workload cluster"
-	$(KUBECTL) --kubeconfig=./test/fv/workload_kubeconfig apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.0/manifests/calico.yaml
+	$(KUBECTL) --kubeconfig=./test/fv/workload_kubeconfig apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.0/manifests/calico.yaml
 
 	@echo wait for calico pod
 	$(KUBECTL) --kubeconfig=./test/fv/workload_kubeconfig wait --for=condition=Available deployment/calico-kube-controllers -n kube-system --timeout=$(TIMEOUT)
@@ -347,6 +350,14 @@ deploy-crds:
 	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_resourcesummaries.yaml
 	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_rolerequests.yaml
 	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_sveltosclusters.yaml
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_configurationbundles.yaml
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_configurationgroups.yaml
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_managementclusterclassifiers.yaml
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_managementclusterclassifierreports.yaml
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_sveltoslicenses.yaml
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/libsveltos/$(TAG)/config/crd/bases/lib.projectsveltos.io_techsupports.yaml
+	@echo 'Install event-manager CRD'
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/event-manager/$(TAG)/config/crd/bases/lib.projectsveltos.io_eventtriggers.yaml
 
 deploy-projectsveltos: $(KUSTOMIZE)
 	# Load projectsveltos image into cluster
@@ -359,6 +370,14 @@ deploy-projectsveltos: $(KUSTOMIZE)
 
 	@echo "Waiting for projectsveltos addon-controller to be available..."
 	$(KUBECTL) wait --for=condition=Available deployment/addon-controller -n projectsveltos --timeout=$(TIMEOUT)
+
+	# The sharded deployments use the service accounts and RBAC shipped in each component manifest
+	@for component in classifier:classifier-manager event-manager:event-manager healthcheck-manager:hc-manager sveltoscluster-manager:sc-manager; do \
+	    repo=$${component%%:*}; depl=$${component##*:}; \
+	    echo "Deploying $$repo"; \
+	    $(KUBECTL) apply -f https://raw.githubusercontent.com/projectsveltos/$$repo/$(TAG)/manifest/manifest.yaml; \
+	    $(KUBECTL) wait --for=condition=Available deployment/$$depl -n projectsveltos --timeout=$(TIMEOUT); \
+	done
 
 	# Install projectsveltos shard-controller
 	@echo 'Install projectsveltos shard-controller'
