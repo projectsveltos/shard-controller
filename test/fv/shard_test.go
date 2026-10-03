@@ -113,6 +113,19 @@ func verifyDeployment(deplTemplate []byte, sveltosNamespace, shardKey string) {
 			currentDeployment)
 		return err == nil
 	}, timeout, pollingInterval).Should(BeTrue())
+
+	Byf("Verify deployment %s/%s has all replicas available", deployment.GetNamespace(), deployment.GetName())
+	Eventually(func() bool {
+		currentDeployment := &appsv1.Deployment{}
+		err = k8sClient.Get(context.TODO(),
+			types.NamespacedName{Namespace: deployment.GetNamespace(), Name: deployment.GetName()},
+			currentDeployment)
+		if err != nil {
+			return false
+		}
+		return currentDeployment.Status.AvailableReplicas > 0 &&
+			currentDeployment.Status.AvailableReplicas == currentDeployment.Status.Replicas
+	}, timeout, pollingInterval).Should(BeTrue())
 }
 
 func verifyDeploymentsAreGone(shardKey string) {
