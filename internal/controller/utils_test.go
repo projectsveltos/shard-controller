@@ -18,7 +18,9 @@ package controller_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
@@ -27,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/textlogger"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,6 +40,7 @@ import (
 	"github.com/projectsveltos/libsveltos/lib/k8s_utils"
 	libsveltosset "github.com/projectsveltos/libsveltos/lib/set"
 	"github.com/projectsveltos/shard-controller/internal/controller"
+	controllerSharding "github.com/projectsveltos/shard-controller/pkg/sharding"
 )
 
 const (
@@ -797,6 +801,164 @@ var _ = Describe("Utils", func() {
 			const expectedDeployments = 5
 			Expect(deploymentList.Items).To(HaveLen(expectedDeployments))
 		})
+	})
+})
+
+var _ = Describe("Deployment template argument helpers", func() {
+	It("setOptions replaces an existing agent-in-mgmt-cluster arg with true", func() {
+		tmpl := controllerSharding.GetAddonControllerTemplate()
+
+		result, err := controller.SetOptions(tmpl)
+		Expect(err).ToNot(HaveOccurred())
+
+		depl := &appsv1.Deployment{}
+		Expect(json.Unmarshal(result, depl)).To(Succeed())
+		Expect(depl.Spec.Template.Spec.Containers).ToNot(BeEmpty())
+		for i := range depl.Spec.Template.Spec.Containers {
+			args := depl.Spec.Template.Spec.Containers[i].Args
+			Expect(args).To(ContainElement("--agent-in-mgmt-cluster=true"))
+			count := 0
+			for _, a := range args {
+				if strings.Contains(a, "agent-in-mgmt-cluster") {
+					count++
+				}
+			}
+			Expect(count).To(Equal(1))
+		}
+	})
+
+	It("setOptions is idempotent when applied twice", func() {
+		tmpl := controllerSharding.GetAddonControllerTemplate()
+
+		once, err := controller.SetOptions(tmpl)
+		Expect(err).ToNot(HaveOccurred())
+		twice, err := controller.SetOptions(once)
+		Expect(err).ToNot(HaveOccurred())
+
+		depl := &appsv1.Deployment{}
+		Expect(json.Unmarshal(twice, depl)).To(Succeed())
+		for i := range depl.Spec.Template.Spec.Containers {
+			args := depl.Spec.Template.Spec.Containers[i].Args
+			count := 0
+			for _, a := range args {
+				if strings.Contains(a, "agent-in-mgmt-cluster") {
+					count++
+				}
+			}
+			Expect(count).To(Equal(1))
+		}
+	})
+
+	It("appendArgsToContainer only adds args to the matching container", func() {
+		tmpl := controllerSharding.GetClassifierTemplate()
+
+		result, err := controller.AppendArgsToContainer(tmpl, "manager",
+			map[string]string{"--sveltos-agent-config": "agent-cm"})
+		Expect(err).ToNot(HaveOccurred())
+
+		depl := &appsv1.Deployment{}
+		Expect(json.Unmarshal(result, depl)).To(Succeed())
+
+		found := false
+		for i := range depl.Spec.Template.Spec.Containers {
+			args := depl.Spec.Template.Spec.Containers[i].Args
+			if depl.Spec.Template.Spec.Containers[i].Name == "manager" {
+				Expect(args).To(ContainElement("--sveltos-agent-config=agent-cm"))
+				found = true
+			} else {
+				Expect(args).ToNot(ContainElement("--sveltos-agent-config=agent-cm"))
+			}
+		}
+		Expect(found).To(BeTrue())
+	})
+
+	It("appendArgsToContainer skips empty values", func() {
+		tmpl := controllerSharding.GetClassifierTemplate()
+
+		result, err := controller.AppendArgsToContainer(tmpl, "manager",
+			map[string]string{"--sveltos-agent-config": ""})
+		Expect(err).ToNot(HaveOccurred())
+
+		depl := &appsv1.Deployment{}
+		Expect(json.Unmarshal(result, depl)).To(Succeed())
+		for i := range depl.Spec.Template.Spec.Containers {
+			Expect(depl.Spec.Template.Spec.Containers[i].Args).ToNot(ContainElement(ContainSubstring("--sveltos-agent-config")))
+		}
+	})
+
+	It("appendArgsToContainer is a no-op when the container name does not match", func() {
+		tmpl := controllerSharding.GetClassifierTemplate()
+
+		result, err := controller.AppendArgsToContainer(tmpl, randomString(),
+			map[string]string{"--sveltos-agent-config": "agent-cm"})
+		Expect(err).ToNot(HaveOccurred())
+
+		u, err := k8s_utils.GetUnstructured(tmpl)
+		Expect(err).ToNot(HaveOccurred())
+		before := &appsv1.Deployment{}
+		Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), before)).To(Succeed())
+		after := &appsv1.Deployment{}
+		Expect(json.Unmarshal(result, after)).To(Succeed())
+
+		Expect(len(after.Spec.Template.Spec.Containers)).To(Equal(len(before.Spec.Template.Spec.Containers)))
+		for i := range after.Spec.Template.Spec.Containers {
+			Expect(after.Spec.Template.Spec.Containers[i].Args).To(Equal(before.Spec.Template.Spec.Containers[i].Args))
+		}
+	})
+
+	It("addDriftDetectionConfig is a no-op when no config is given", func() {
+		tmpl := controllerSharding.GetAddonControllerTemplate()
+
+		result, err := controller.AddDriftDetectionConfig(tmpl, "")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(tmpl))
+	})
+
+	It("addDriftDetectionConfig adds the flag to the controller container", func() {
+		tmpl := controllerSharding.GetAddonControllerTemplate()
+
+		result, err := controller.AddDriftDetectionConfig(tmpl, "drift-cm")
+		Expect(err).ToNot(HaveOccurred())
+
+		depl := &appsv1.Deployment{}
+		Expect(json.Unmarshal(result, depl)).To(Succeed())
+
+		found := false
+		for i := range depl.Spec.Template.Spec.Containers {
+			if depl.Spec.Template.Spec.Containers[i].Name == "controller" {
+				Expect(depl.Spec.Template.Spec.Containers[i].Args).To(ContainElement("--drift-detection-config=drift-cm"))
+				found = true
+			}
+		}
+		Expect(found).To(BeTrue())
+	})
+
+	It("addClassifierConfigs adds only the non-empty flags to the manager container", func() {
+		tmpl := controllerSharding.GetClassifierTemplate()
+
+		result, err := controller.AddClassifierConfigs(tmpl, "agent-cm", "")
+		Expect(err).ToNot(HaveOccurred())
+
+		depl := &appsv1.Deployment{}
+		Expect(json.Unmarshal(result, depl)).To(Succeed())
+
+		found := false
+		for i := range depl.Spec.Template.Spec.Containers {
+			if depl.Spec.Template.Spec.Containers[i].Name == "manager" {
+				Expect(depl.Spec.Template.Spec.Containers[i].Args).To(ContainElement("--sveltos-agent-config=agent-cm"))
+				Expect(depl.Spec.Template.Spec.Containers[i].Args).ToNot(ContainElement(ContainSubstring("--sveltos-applier-config")))
+				found = true
+			}
+		}
+		Expect(found).To(BeTrue())
+	})
+
+	It("addClassifierConfigs is a no-op when both configs are empty", func() {
+		tmpl := controllerSharding.GetClassifierTemplate()
+
+		result, err := controller.AddClassifierConfigs(tmpl, "", "")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(tmpl))
 	})
 })
 

@@ -36,6 +36,11 @@ var (
 	GetPatchesFromConfigMap = getPatchesFromConfigMap
 	ApplyShardPatches       = applyShardPatches
 
+	SetOptions              = setOptions
+	AppendArgsToContainer   = appendArgsToContainer
+	AddDriftDetectionConfig = addDriftDetectionConfig
+	AddClassifierConfigs    = addClassifierConfigs
+
 	ClusterMap = &clusterMap
 	ShardMap   = &shardMap
 )
