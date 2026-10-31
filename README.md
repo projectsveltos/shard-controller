@@ -17,7 +17,10 @@
 
 </div>
 
-<img src="https://raw.githubusercontent.com/projectsveltos/sveltos/main/docs/assets/logo.png" width="200">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/projectsveltos/sveltos/main/docs/assets/logo.png" width="200">
+  <img src="https://raw.githubusercontent.com/projectsveltos/sveltos/main/docs/assets/mascott/admiral-sveltopus-fleet-whitebg.png" width="220" alt="Admiral Sveltopus, the Sveltos mascot">
+</p>
 
 ## What this repository is
 shard-controller implements horizontal scaling for Sveltos: it watches managed clusters for a shard annotation and automatically provisions (or removes) a dedicated set of Sveltos controller Deployments for each distinct shard key. This lets a large fleet be partitioned across multiple, independently scaled sets of controllers instead of a single one handling every cluster.
