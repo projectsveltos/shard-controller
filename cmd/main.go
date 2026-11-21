@@ -54,21 +54,24 @@ import (
 )
 
 var (
-	setupLog                 = ctrl.Log.WithName("setup")
-	diagnosticsAddress       string
-	insecureDiagnostics      bool
-	agentInMgmtCluster       bool
-	driftDetectionConfig     string
-	sveltosAgentConfig       string
-	sveltosApplierConfig     string
-	reportMode               controller.ReportMode
-	tmpReportMode            int
-	restConfigQPS            float32
-	restConfigBurst          int
-	webhookPort              int
-	syncPeriod               time.Duration
-	healthAddr               string
-	shardComponentsConfigMap string
+	setupLog                          = ctrl.Log.WithName("setup")
+	diagnosticsAddress                string
+	insecureDiagnostics               bool
+	agentInMgmtCluster                bool
+	disableSveltosAgent               bool
+	sveltosAgentClustersPerInstance   int
+	driftDetectionClustersPerInstance int
+	driftDetectionConfig              string
+	sveltosAgentConfig                string
+	sveltosApplierConfig              string
+	reportMode                        controller.ReportMode
+	tmpReportMode                     int
+	restConfigQPS                     float32
+	restConfigBurst                   int
+	webhookPort                       int
+	syncPeriod                        time.Duration
+	healthAddr                        string
+	shardComponentsConfigMap          string
 )
 
 const (
@@ -101,6 +104,9 @@ func main() {
 	sveltosNamespace := getSveltosNamespace()
 	controller.SetSveltosNamespace(sveltosNamespace)
 	controller.SetShardComponentsConfigMap(shardComponentsConfigMap)
+	controller.SetSveltosAgentDisabled(disableSveltosAgent)
+	controller.SetSveltosAgentClustersPerInstance(sveltosAgentClustersPerInstance)
+	controller.SetDriftDetectionClustersPerInstance(driftDetectionClustersPerInstance)
 
 	ctrlOptions := ctrl.Options{
 		Scheme:                 scheme,
@@ -187,6 +193,29 @@ func initFlags(fs *pflag.FlagSet) {
 		"agent-in-mgmt-cluster",
 		false,
 		"flag which is passed to sveltos deployments created for a cluster shard")
+
+	fs.BoolVar(&disableSveltosAgent,
+		"disable-sveltos-agent",
+		false,
+		"when set, sveltos-agent is not deployed. addon-controller and classifier deployments created for a "+
+			"cluster shard are started with --disable-sveltos-agent, event-manager and healthcheck-manager "+
+			"deployments are not created")
+
+	fs.IntVar(&sveltosAgentClustersPerInstance,
+		"sveltos-agent-clusters-per-instance",
+		1,
+		"agentless mode only (requires --agent-in-mgmt-cluster). How many clusters one sveltos-agent serves. "+
+			"Passed to classifier deployments created for a cluster shard as --agent-clusters-per-instance. "+
+			"1 (the default) means one sveltos-agent per cluster. A higher value requires a Sveltos Enterprise "+
+			"license granting AgentGrouping")
+
+	fs.IntVar(&driftDetectionClustersPerInstance,
+		"drift-detection-clusters-per-instance",
+		1,
+		"agentless mode only (requires --agent-in-mgmt-cluster). How many clusters one drift-detection-manager serves. "+
+			"Passed to addon-controller deployments created for a cluster shard as --agent-clusters-per-instance. "+
+			"1 (the default) means one drift-detection-manager per cluster. A higher value requires a Sveltos "+
+			"Enterprise license granting AgentGrouping")
 
 	fs.StringVar(&driftDetectionConfig,
 		"drift-detection-config",

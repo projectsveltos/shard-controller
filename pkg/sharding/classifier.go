@@ -44,7 +44,7 @@ spec:
         - --shard-key={{.SHARD}}
         - --capi-onboard-annotation=
         - --v=5
-        - --version=v1.17.0
+        - --version=main
         - --registry=
         - --agent-in-mgmt-cluster=false
         command:
@@ -62,7 +62,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: docker.io/projectsveltos/classifier@sha256:3fddc6c8abfd071c0deae7871d84d632fa31cc2024eac0fe2c32aea162cc4e5f
+        image: docker.io/projectsveltos/classifier@sha256:5c93976c4a174e84a8691c7cf18f835a9078a0ccc562fc35217a1021bda9f382
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -110,7 +110,7 @@ spec:
               fieldPath: metadata.namespace
         - name: IS_INITIALIZATION
           value: "true"
-        image: docker.io/projectsveltos/classifier@sha256:3fddc6c8abfd071c0deae7871d84d632fa31cc2024eac0fe2c32aea162cc4e5f
+        image: docker.io/projectsveltos/classifier@sha256:5c93976c4a174e84a8691c7cf18f835a9078a0ccc562fc35217a1021bda9f382
         imagePullPolicy: IfNotPresent
         name: migrate
         resources:
