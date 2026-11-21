@@ -359,6 +359,121 @@ var _ = Describe("Utils", func() {
 		Expect(len(deploymentList.Items)).To(Equal(expectedDeployment))
 	})
 
+	It("deployControllers, when sveltos-agent is disabled, passes --disable-sveltos-agent and skips "+
+		"event-manager and healthcheck-manager", func() {
+
+		controller.SetSveltosAgentDisabled(true)
+		defer controller.SetSveltosAgentDisabled(false)
+
+		namespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: sveltosNamespace,
+			},
+		}
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(namespace).Build()
+
+		shardKey := randomString()
+		Expect(controller.DeployControllers(context.TODO(), c, shardKey,
+			false, "", "", "", logger)).To(Succeed())
+
+		deploymentList := &appsv1.DeploymentList{}
+		Expect(c.List(context.TODO(), deploymentList, client.InNamespace(namespace.Name))).To(Succeed())
+
+		deploymentNames := make([]string, 0, len(deploymentList.Items))
+		for i := range deploymentList.Items {
+			deploymentNames = append(deploymentNames, deploymentList.Items[i].Name)
+		}
+		Expect(deploymentNames).To(ConsistOf(
+			"addon-controller-"+shardKey, "classifier-manager-"+shardKey, "sc-manager-"+shardKey))
+
+		for i := range deploymentList.Items {
+			deployment := &deploymentList.Items[i]
+			args := deployment.Spec.Template.Spec.Containers[0].Args
+			if deployment.Name == "sc-manager-"+shardKey {
+				Expect(args).ToNot(ContainElement("--disable-sveltos-agent=true"))
+				continue
+			}
+			Expect(args).To(ContainElement("--disable-sveltos-agent=true"))
+		}
+	})
+
+	It("deployControllers passes --agent-clusters-per-instance to classifier and addon-controller when grouping is requested", func() {
+		controller.SetSveltosAgentClustersPerInstance(5)
+		controller.SetDriftDetectionClustersPerInstance(7)
+		defer controller.SetSveltosAgentClustersPerInstance(1)
+		defer controller.SetDriftDetectionClustersPerInstance(1)
+
+		namespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: sveltosNamespace,
+			},
+		}
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(namespace).Build()
+
+		shardKey := randomString()
+		Expect(controller.DeployControllers(context.TODO(), c, shardKey,
+			true, "", "", "", logger)).To(Succeed())
+
+		classifier := &appsv1.Deployment{}
+		Expect(c.Get(context.TODO(),
+			types.NamespacedName{Namespace: sveltosNamespace, Name: "classifier-manager-" + shardKey}, classifier)).To(Succeed())
+		Expect(classifier.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--agent-clusters-per-instance=5"))
+
+		addonController := &appsv1.Deployment{}
+		Expect(c.Get(context.TODO(),
+			types.NamespacedName{Namespace: sveltosNamespace, Name: "addon-controller-" + shardKey}, addonController)).To(Succeed())
+		Expect(addonController.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--agent-clusters-per-instance=7"))
+
+		// Other components do not get it
+		scManager := &appsv1.Deployment{}
+		Expect(c.Get(context.TODO(),
+			types.NamespacedName{Namespace: sveltosNamespace, Name: "sc-manager-" + shardKey}, scManager)).To(Succeed())
+		Expect(scManager.Spec.Template.Spec.Containers[0].Args).ToNot(ContainElement(ContainSubstring("clusters-per-instance")))
+	})
+
+	It("deployControllers does not pass --agent-clusters-per-instance by default", func() {
+		namespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: sveltosNamespace,
+			},
+		}
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(namespace).Build()
+
+		Expect(controller.DeployControllers(context.TODO(), c, randomString(),
+			true, "", "", "", logger)).To(Succeed())
+
+		deploymentList := &appsv1.DeploymentList{}
+		Expect(c.List(context.TODO(), deploymentList, client.InNamespace(namespace.Name))).To(Succeed())
+		Expect(deploymentList.Items).ToNot(BeEmpty())
+		for i := range deploymentList.Items {
+			for _, container := range deploymentList.Items[i].Spec.Template.Spec.Containers {
+				Expect(container.Args).ToNot(ContainElement(ContainSubstring("clusters-per-instance")))
+			}
+		}
+	})
+
+	It("deployControllers does not pass --disable-sveltos-agent when sveltos-agent is not disabled", func() {
+		namespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: sveltosNamespace,
+			},
+		}
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(namespace).Build()
+
+		Expect(controller.DeployControllers(context.TODO(), c, randomString(),
+			false, "", "", "", logger)).To(Succeed())
+
+		deploymentList := &appsv1.DeploymentList{}
+		Expect(c.List(context.TODO(), deploymentList, client.InNamespace(namespace.Name))).To(Succeed())
+		Expect(deploymentList.Items).To(HaveLen(5))
+
+		for i := range deploymentList.Items {
+			for _, container := range deploymentList.Items[i].Spec.Template.Spec.Containers {
+				Expect(container.Args).ToNot(ContainElement("--disable-sveltos-agent=true"))
+			}
+		}
+	})
+
 	It("deployControllers deploys projectsveltos controllers passing agent-in-mgmt-cluster option", func() {
 		deploymentList := &appsv1.DeploymentList{}
 		listOptions := []client.ListOption{

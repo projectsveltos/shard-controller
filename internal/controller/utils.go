@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -286,7 +287,7 @@ func addTypeInformationToObject(scheme *runtime.Scheme, obj client.Object) {
 	}
 }
 
-func deployControllers(ctx context.Context, c client.Client, shardKey string, //nolint: funlen // deploying sveltos controllers
+func deployControllers(ctx context.Context, c client.Client, shardKey string,
 	agentInMgmtCluster bool, driftDetectionConfig, sveltosAgentConfig, sveltosApplierConfig string, logger logr.Logger) error {
 
 	if shardKey == "" {
@@ -302,15 +303,7 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 		return err
 	}
 
-	addonControllerTemplate := controllerSharding.GetAddonControllerTemplate()
-	if agentInMgmtCluster {
-		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
-		addonControllerTemplate, err = setOptions(addonControllerTemplate)
-		if err != nil {
-			return err
-		}
-	}
-	addonControllerTemplate, err = addDriftDetectionConfig(addonControllerTemplate, driftDetectionConfig)
+	addonControllerTemplate, err := getAddonControllerTemplate(agentInMgmtCluster, driftDetectionConfig, logger)
 	if err != nil {
 		return err
 	}
@@ -320,15 +313,7 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 		return err
 	}
 
-	classifierTemplate := controllerSharding.GetClassifierTemplate()
-	if agentInMgmtCluster {
-		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
-		classifierTemplate, err = setOptions(classifierTemplate)
-		if err != nil {
-			return err
-		}
-	}
-	classifierTemplate, err = addClassifierConfigs(classifierTemplate, sveltosAgentConfig, sveltosApplierConfig)
+	classifierTemplate, err := getClassifierTemplate(agentInMgmtCluster, sveltosAgentConfig, sveltosApplierConfig, logger)
 	if err != nil {
 		return err
 	}
@@ -343,6 +328,12 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 	if err != nil {
 		logger.V(logs.LogInfo).Info(fmt.Sprintf("failed to deploy sveltoscluster-manager %v", err))
 		return err
+	}
+
+	if getSveltosAgentDisabled() {
+		// event-manager and healthcheck-manager rely on sveltos-agent: not needed when it is not deployed
+		logger.V(logs.LogDebug).Info("sveltos-agent is disabled: event-manager and healthcheck-manager not deployed")
+		return nil
 	}
 
 	eventManagerTemplate := controllerSharding.GetEventManagerTemplate()
@@ -376,12 +367,88 @@ func deployControllers(ctx context.Context, c client.Client, shardKey string, //
 	return nil
 }
 
+// getAddonControllerTemplate returns the addon-controller template for a shard, with all the options
+// shard-controller was started with applied
+func getAddonControllerTemplate(agentInMgmtCluster bool, driftDetectionConfig string, logger logr.Logger,
+) ([]byte, error) {
+
+	tmpl := controllerSharding.GetAddonControllerTemplate()
+
+	var err error
+	if agentInMgmtCluster {
+		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
+		tmpl, err = setOptions(tmpl)
+		if err != nil {
+			return nil, err
+		}
+	}
+	tmpl, err = addDriftDetectionConfig(tmpl, driftDetectionConfig)
+	if err != nil {
+		return nil, err
+	}
+	tmpl, err = addDisableSveltosAgent(tmpl, "controller")
+	if err != nil {
+		return nil, err
+	}
+	return addClustersPerInstance(tmpl, "controller", driftDetectionClustersPerInstance)
+}
+
+// getClassifierTemplate returns the classifier template for a shard, with all the options
+// shard-controller was started with applied
+func getClassifierTemplate(agentInMgmtCluster bool, sveltosAgentConfig, sveltosApplierConfig string,
+	logger logr.Logger) ([]byte, error) {
+
+	tmpl := controllerSharding.GetClassifierTemplate()
+
+	var err error
+	if agentInMgmtCluster {
+		logger.V(logs.LogDebug).Info("setting agent-in-mgmt-cluster")
+		tmpl, err = setOptions(tmpl)
+		if err != nil {
+			return nil, err
+		}
+	}
+	tmpl, err = addClassifierConfigs(tmpl, sveltosAgentConfig, sveltosApplierConfig)
+	if err != nil {
+		return nil, err
+	}
+	tmpl, err = addDisableSveltosAgent(tmpl, "manager")
+	if err != nil {
+		return nil, err
+	}
+	return addClustersPerInstance(tmpl, "manager", sveltosAgentClustersPerInstance)
+}
+
 func addDriftDetectionConfig(tmpl []byte, driftDetectionConfig string) ([]byte, error) {
 	if driftDetectionConfig == "" {
 		return tmpl, nil
 	}
 	return appendArgsToContainer(tmpl, "controller",
 		map[string]string{"--drift-detection-config": driftDetectionConfig})
+}
+
+// addDisableSveltosAgent adds --disable-sveltos-agent=true to the container, if sveltos-agent is disabled
+func addDisableSveltosAgent(tmpl []byte, containerName string) ([]byte, error) {
+	if !getSveltosAgentDisabled() {
+		return tmpl, nil
+	}
+	return appendArgsToContainer(tmpl, containerName, map[string]string{"--disable-sveltos-agent": "true"})
+}
+
+const (
+	// minClustersPerInstanceForGrouping is the smallest value of clusters per instance that enables grouping.
+	// With 1 an instance serves one cluster, which is what the components do by default.
+	minClustersPerInstanceForGrouping = 2
+)
+
+// addClustersPerInstance adds --agent-clusters-per-instance to the container, when grouping is requested
+// (a value lower than 2 keeps one instance per cluster, the default of the component)
+func addClustersPerInstance(tmpl []byte, containerName string, clustersPerInstance int) ([]byte, error) {
+	if clustersPerInstance < minClustersPerInstanceForGrouping {
+		return tmpl, nil
+	}
+	return appendArgsToContainer(tmpl, containerName,
+		map[string]string{"--agent-clusters-per-instance": strconv.Itoa(clustersPerInstance)})
 }
 
 func addClassifierConfigs(tmpl []byte, sveltosAgentConfig, sveltosApplierConfig string) ([]byte, error) {
