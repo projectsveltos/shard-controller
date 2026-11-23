@@ -35,5 +35,3 @@ pkg/sharding/hm.yaml-e
 pkg/sharding/sc.yaml-e
 
 version.txt
-
-.dockerignore
