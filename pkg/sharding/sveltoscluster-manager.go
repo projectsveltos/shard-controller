@@ -55,7 +55,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: docker.io/projectsveltos/sveltoscluster-manager:v1.17.0
+        image: docker.io/projectsveltos/sveltoscluster-manager@sha256:de3b0a7c1236f981ba7bd7f72238bf6e65514abddefcfcb279fbd3876735d183
         livenessProbe:
           failureThreshold: 3
           httpGet:
